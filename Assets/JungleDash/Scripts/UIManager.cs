@@ -1,3 +1,5 @@
+// UIManager.cs – Temple Run-inspired HUD and menus
+// Dark stone UI panels, gold text, Indonesian localization.
 using UnityEngine;
 
 namespace JungleDash
@@ -6,9 +8,14 @@ namespace JungleDash
     {
         public static UIManager Instance { get; private set; }
 
-        private GUIStyle titleStyle, subStyle, cardStyle, hudStyle, btnStyle, touchStyle, badgeStyle;
+        // ── Styles ────────────────────────────────────────────────────────────
+        private GUIStyle titleStyle, subtitleStyle, bodyStyle, btnStyle;
+        private GUIStyle hudStyle, badgeStyle, touchBtnStyle, panelStyle;
+        private bool     stylesBuilt;
+
+        // Touch swipe
         private Vector2 touchStart;
-        private bool swiping;
+        private bool    touchActive;
 
         private void Awake()
         {
@@ -16,73 +23,117 @@ namespace JungleDash
             Instance = this;
         }
 
-        private void Update() => DetectSwipe();
+        private void Update() => HandleTouch();
 
-        private void DetectSwipe()
+        // ── Touch / swipe ─────────────────────────────────────────────────────
+        private void HandleTouch()
         {
             var g = JungleDashGame.Instance;
             if (g == null || g.CurrentState != GameState.Playing) return;
             if (Input.touchCount == 0) return;
 
             Touch t = Input.GetTouch(0);
-            if (t.phase == TouchPhase.Began) { touchStart = t.position; swiping = true; }
-            else if (t.phase == TouchPhase.Ended && swiping)
+            if (t.phase == TouchPhase.Began)
             {
-                swiping = false;
-                Vector2 d = t.position - touchStart;
-                if (d.magnitude < Screen.width * 0.08f) return;
-                if (Mathf.Abs(d.x) > Mathf.Abs(d.y))
+                touchStart  = t.position;
+                touchActive = true;
+            }
+            else if (t.phase == TouchPhase.Ended && touchActive)
+            {
+                touchActive = false;
+                Vector2 delta   = t.position - touchStart;
+                float   minSwipe = Screen.width * 0.07f;
+                if (delta.magnitude < minSwipe) return;
+
+                if (Mathf.Abs(delta.x) > Mathf.Abs(delta.y))
                 {
-                    if (d.x > 0) g.Player.MoveRight(); else g.Player.MoveLeft();
+                    if (delta.x > 0) g.Player.MoveRight();
+                    else             g.Player.MoveLeft();
                 }
-                else if (d.y > 0) g.Player.Jump();
+                else
+                {
+                    if (delta.y > 0) g.Player.Jump();
+                    else             g.Player.Slide();
+                }
             }
         }
 
-        private void InitStyles()
+        // ── Style builder ─────────────────────────────────────────────────────
+        private void BuildStyles()
         {
-            if (titleStyle != null) return;
+            if (stylesBuilt) return;
+            stylesBuilt = true;
+
             float h = Screen.height;
 
-            Texture2D dark = Tex(new Color(0.05f, 0.12f, 0.06f, 0.88f));
-            Texture2D btn  = Tex(new Color(0.16f, 0.44f, 0.20f, 0.95f));
-            Texture2D tBtn = Tex(new Color(0.04f, 0.22f, 0.12f, 0.72f));
+            // Dark stone panel
+            var stoneBg  = Tex(new Color(0.06f, 0.05f, 0.04f, 0.92f));
+            var stoneDark = Tex(new Color(0.10f, 0.08f, 0.06f, 0.96f));
+            // Gold-outline button
+            var btnBg    = Tex(new Color(0.55f, 0.38f, 0.05f, 0.95f));
+            var btnHover = Tex(new Color(0.72f, 0.52f, 0.08f, 0.98f));
+            // Touch control translucent
+            var touchBg  = Tex(new Color(0.12f, 0.10f, 0.06f, 0.68f));
 
-            titleStyle = new GUIStyle(GUI.skin.label) {
-                fontSize = Mathf.RoundToInt(h * 0.065f), fontStyle = FontStyle.Bold,
+            titleStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize   = Mathf.RoundToInt(h * 0.072f),
+                fontStyle  = FontStyle.Bold,
+                alignment  = TextAnchor.MiddleCenter,
+                normal     = { textColor = new Color(1.0f, 0.85f, 0.20f) },  // temple gold
+                wordWrap   = false
+            };
+            subtitleStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize  = Mathf.RoundToInt(h * 0.026f),
                 alignment = TextAnchor.MiddleCenter,
-                normal = { textColor = new Color(1f, 0.88f, 0.3f) }
+                normal    = { textColor = new Color(0.80f, 0.72f, 0.55f) },  // aged parchment
+                wordWrap  = true
             };
-            subStyle = new GUIStyle(GUI.skin.label) {
-                fontSize = Mathf.RoundToInt(h * 0.025f),
+            bodyStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize   = Mathf.RoundToInt(h * 0.030f),
+                fontStyle  = FontStyle.Bold,
+                alignment  = TextAnchor.MiddleLeft,
+                normal     = { textColor = new Color(0.95f, 0.88f, 0.68f) }
+            };
+            hudStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize   = Mathf.RoundToInt(h * 0.032f),
+                fontStyle  = FontStyle.Bold,
+                alignment  = TextAnchor.MiddleLeft,
+                normal     = { textColor = Color.white }
+            };
+            panelStyle = new GUIStyle(GUI.skin.box)
+            {
+                normal = { background = stoneBg, textColor = Color.white }
+            };
+            btnStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize  = Mathf.RoundToInt(h * 0.036f),
+                fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
-                normal = { textColor = new Color(0.85f, 0.95f, 0.85f) }
+                normal    = { background = btnBg,    textColor = new Color(1f, 0.94f, 0.72f) },
+                hover     = { background = btnHover, textColor = Color.white },
+                active    = { background = btnHover, textColor = Color.white }
             };
-            cardStyle = new GUIStyle(GUI.skin.box) {
-                normal = { background = dark, textColor = Color.white }
-            };
-            hudStyle = new GUIStyle(GUI.skin.label) {
-                fontSize = Mathf.RoundToInt(h * 0.028f), fontStyle = FontStyle.Bold,
-                normal = { textColor = Color.white }
-            };
-            btnStyle = new GUIStyle(GUI.skin.button) {
-                fontSize = Mathf.RoundToInt(h * 0.035f), fontStyle = FontStyle.Bold,
+            touchBtnStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize  = Mathf.RoundToInt(h * 0.038f),
+                fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
-                normal = { background = btn, textColor = Color.white }
+                normal    = { background = touchBg, textColor = new Color(1f, 0.90f, 0.65f) }
             };
-            touchStyle = new GUIStyle(GUI.skin.button) {
-                fontSize = Mathf.RoundToInt(h * 0.036f), fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter,
-                normal = { background = tBtn, textColor = new Color(1f, 1f, 1f, 0.9f) }
-            };
-            badgeStyle = new GUIStyle(GUI.skin.box) {
-                fontSize = Mathf.RoundToInt(h * 0.022f), fontStyle = FontStyle.Bold,
+            badgeStyle = new GUIStyle(GUI.skin.box)
+            {
+                fontSize  = Mathf.RoundToInt(h * 0.022f),
+                fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleLeft,
-                normal = { textColor = new Color(1f, 0.95f, 0.5f) }
+                normal    = { background = stoneDark, textColor = new Color(1f, 0.82f, 0.22f) }
             };
         }
 
-        private Texture2D Tex(Color c)
+        private static Texture2D Tex(Color c)
         {
             var t = new Texture2D(2, 2);
             t.SetPixels(new[] { c, c, c, c });
@@ -90,148 +141,187 @@ namespace JungleDash
             return t;
         }
 
+        // ── OnGUI entry ───────────────────────────────────────────────────────
         private void OnGUI()
         {
-            InitStyles();
+            BuildStyles();
             var g = JungleDashGame.Instance;
             if (g == null) return;
+
             switch (g.CurrentState)
             {
-                case GameState.Menu:     DrawMenu(g);    break;
+                case GameState.Menu:     DrawMenu(g);     break;
                 case GameState.Playing:  DrawHUD(g); DrawTouchControls(g); break;
-                case GameState.Paused:   DrawHUD(g); DrawPause(g); break;
+                case GameState.Paused:   DrawHUD(g); DrawPause(g);         break;
                 case GameState.GameOver: DrawGameOver(g); break;
             }
         }
 
+        // ── Main Menu ─────────────────────────────────────────────────────────
         private void DrawMenu(JungleDashGame g)
         {
-            float w = Screen.width, h = Screen.height;
-            float pw = Mathf.Min(w * 0.85f, 480f), ph = Mathf.Min(h * 0.72f, 540f);
-            Rect r = new Rect((w - pw) * 0.5f, (h - ph) * 0.5f, pw, ph);
-            GUI.Box(r, "", cardStyle);
-            GUILayout.BeginArea(r);
-            GUILayout.Space(22);
-            GUILayout.Label("🌴 JUNGLE DASH 🌴", titleStyle);
-            GUILayout.Label("ENDLESS RUNNER HUTAN TROPIS", subStyle);
+            float W = Screen.width, H = Screen.height;
+            float pw = Mathf.Min(W * .86f, 520f);
+            float ph = Mathf.Min(H * .76f, 580f);
+            Rect  r  = Centre(W, H, pw, ph);
+            GUI.Box(r, "", panelStyle);
+
+            GUILayout.BeginArea(Inset(r, 18));
+            GUILayout.Space(16);
+
+            GUILayout.Label("⚔  JUNGLE DASH  ⚔", titleStyle);
+            GUILayout.Label("Lari dari kutukan kuil kuno!", subtitleStyle);
+
             GUILayout.FlexibleSpace();
-            GUILayout.BeginVertical(GUI.skin.box);
-            GUILayout.Label($"🏆 Skor Tertinggi: {g.HighScore:#,0}", hudStyle);
-            GUILayout.Label($"🪙 Total Koin: {g.TotalCoins:#,0}", hudStyle);
+
+            // Stats card
+            GUI.Box(GUILayoutUtility.GetRect(pw - 36, H * .14f), "", panelStyle);
+            GUILayout.Space(-H * .14f);
+            GUILayout.BeginVertical();
+            GUILayout.Space(4);
+            GUILayout.Label($"  🏆  Rekor:  {g.HighScore:#,0}", bodyStyle);
+            GUILayout.Label($"  🪙  Koin:    {g.TotalCoins:#,0}", bodyStyle);
             GUILayout.EndVertical();
+
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("▶  MULAI BERLARI", btnStyle, GUILayout.Height(h * 0.09f)))
-            { SoundManager.Instance?.PlayClick(); g.StartGame(); }
+
+            if (GUILayout.Button("▶   MULAI BERLARI", btnStyle, GUILayout.Height(H * .10f)))
+            {
+                SoundManager.Instance?.PlayClick();
+                g.StartGame();
+            }
+
             GUILayout.Space(10);
-            GUILayout.Label("Geser kiri/kanan • Geser atas / Spasi untuk Lompat", subStyle);
+            GUILayout.Label("Geser ◀ ▶ belok  •  Geser ▲ lompat  •  Geser ▼ slide", subtitleStyle);
             GUILayout.Space(14);
             GUILayout.EndArea();
         }
 
+        // ── HUD ───────────────────────────────────────────────────────────────
         private void DrawHUD(JungleDashGame g)
         {
-            float w = Screen.width, h = Screen.height;
-            float cw = Mathf.Min(w * 0.48f, 260f), ch = h * 0.17f;
-            Rect r = new Rect(15, 15, cw, ch);
-            GUI.Box(r, "", cardStyle);
-            GUILayout.BeginArea(r);
-            GUILayout.Space(5);
-            GUILayout.Label($"⭐ SKOR: {g.Score:#,0}", hudStyle);
-            GUILayout.Label($"🏃 JARAK: {Mathf.FloorToInt(g.Distance)} m", hudStyle);
-            GUILayout.Label($"🪙 KOIN: {g.Coins}", hudStyle);
+            float W = Screen.width, H = Screen.height;
+
+            // Score/distance card (top-left)
+            float cw = Mathf.Min(W * .44f, 240f);
+            float ch = H * .175f;
+            Rect  cr = new Rect(14, 14, cw, ch);
+            GUI.Box(cr, "", panelStyle);
+            GUILayout.BeginArea(Inset(cr, 8));
+            GUILayout.Space(2);
+            GUILayout.Label($"⭐  {g.Score:#,0}", hudStyle);
+            GUILayout.Label($"🏃  {Mathf.FloorToInt(g.Distance)} m", hudStyle);
+            GUILayout.Label($"🪙  {g.Coins}", hudStyle);
             GUILayout.EndArea();
 
-            // Power-up badges
-            float by = 15f;
-            DrawBadge(PowerUpType.Magnet,      "🧲 MAGNET",   cw + 28, ref by);
-            DrawBadge(PowerUpType.Shield,      "🛡 PERISAI",  cw + 28, ref by);
-            DrawBadge(PowerUpType.SpeedBoost,  "⚡ KILAT",    cw + 28, ref by);
-            DrawBadge(PowerUpType.DoubleScore, "2x SKOR",     cw + 28, ref by);
-            DrawBadge(PowerUpType.Fly,         "🪽 TERBANG",  cw + 28, ref by);
+            // Power-up timers (below score card)
+            float by = 14f + ch + 6f;
+            DrawBadge(PowerUpType.Magnet,      "🧲 MAGNET",   14, ref by);
+            DrawBadge(PowerUpType.Shield,      "🛡 PERISAI",  14, ref by);
+            DrawBadge(PowerUpType.SpeedBoost,  "⚡ KILAT",    14, ref by);
+            DrawBadge(PowerUpType.DoubleScore, "2✕ SKOR",     14, ref by);
+            DrawBadge(PowerUpType.Fly,         "🪽 TERBANG",  14, ref by);
 
-            // Pause button
-            float pb = Mathf.Min(h * 0.08f, 65f);
-            if (GUI.Button(new Rect(w - pb - 15, 15, pb, pb), "⏸", btnStyle))
-            { SoundManager.Instance?.PlayClick(); g.PauseGame(); }
+            // Pause button (top-right)
+            float pb = Mathf.Min(H * .08f, 64f);
+            if (GUI.Button(new Rect(W - pb - 14, 14, pb, pb), "⏸", btnStyle))
+            {
+                SoundManager.Instance?.PlayClick();
+                g.PauseGame();
+            }
         }
 
         private void DrawBadge(PowerUpType type, string label, float x, ref float y)
         {
             var pm = PowerUpManager.Instance;
             if (pm == null || !pm.IsActive(type)) return;
-            float t = pm.GetRemainingTime(type);
+            float t   = pm.GetRemainingTime(type);
             string txt = type == PowerUpType.Shield ? "AKTIF" : $"{t:0.0}s";
-            float bh = Screen.height * 0.045f;
-            GUI.Box(new Rect(x, y, 190f, bh), $"{label} ({txt})", badgeStyle);
-            y += bh + 5f;
+            float bh  = Screen.height * .044f;
+            GUI.Box(new Rect(x, y, 200f, bh), $"{label} ({txt})", badgeStyle);
+            y += bh + 4f;
         }
 
+        // ── Touch controls (bottom) ───────────────────────────────────────────
         private void DrawTouchControls(JungleDashGame g)
         {
-            float w = Screen.width, h = Screen.height;
-            float bh = Mathf.Min(h * 0.12f, 90f);
-            float sw = Mathf.Min(w * 0.28f, 150f);
-            float jw = Mathf.Min(w * 0.32f, 180f);
+            float W = Screen.width, H = Screen.height;
+            float bh = Mathf.Min(H * .115f, 88f);
+            float sw = Mathf.Min(W * .26f, 140f);
+            float jw = Mathf.Min(W * .30f, 165f);
+            float sl = Mathf.Min(W * .22f, 120f);
+            float by = H - bh - 22f;
 
-            if (GUI.Button(new Rect(20, h - bh - 25, sw, bh), "◀ KIRI", touchStyle))
-                g.Player.MoveLeft();
-            if (GUI.Button(new Rect((w - jw) * 0.5f, h - bh - 25, jw, bh), "⬆ LOMPAT", touchStyle))
-                g.Player.Jump();
-            if (GUI.Button(new Rect(w - sw - 20, h - bh - 25, sw, bh), "KANAN ▶", touchStyle))
-                g.Player.MoveRight();
+            if (GUI.Button(new Rect(18, by, sw, bh), "◀", touchBtnStyle))                g.Player.MoveLeft();
+            if (GUI.Button(new Rect(W * .3f, by, jw, bh), "⬆  LOMPAT", touchBtnStyle))  g.Player.Jump();
+            if (GUI.Button(new Rect(W * .55f, by, sl, bh), "⬇  SLIDE",  touchBtnStyle))  g.Player.Slide();
+            if (GUI.Button(new Rect(W - sw - 18, by, sw, bh), "▶",       touchBtnStyle)) g.Player.MoveRight();
         }
 
+        // ── Pause ─────────────────────────────────────────────────────────────
         private void DrawPause(JungleDashGame g)
         {
-            float w = Screen.width, h = Screen.height;
-            float pw = Mathf.Min(w * 0.78f, 420f), ph = Mathf.Min(h * 0.55f, 380f);
-            Rect r = new Rect((w - pw) * 0.5f, (h - ph) * 0.5f, pw, ph);
-            GUI.Box(r, "", cardStyle);
-            GUILayout.BeginArea(r);
+            float W = Screen.width, H = Screen.height;
+            float pw = Mathf.Min(W * .80f, 440f), ph = Mathf.Min(H * .56f, 400f);
+            Rect  r  = Centre(W, H, pw, ph);
+            GUI.Box(r, "", panelStyle);
+            GUILayout.BeginArea(Inset(r, 18));
+            GUILayout.Space(16);
+            GUILayout.Label("⏸  DIJEDA", titleStyle);
             GUILayout.Space(18);
-            GUILayout.Label("⏸  GAME DIJEDA", titleStyle);
-            GUILayout.Space(20);
-            if (GUILayout.Button("▶  LANJUTKAN", btnStyle, GUILayout.Height(h * 0.08f)))
+            if (GUILayout.Button("▶  LANJUTKAN", btnStyle, GUILayout.Height(H * .085f)))
             { SoundManager.Instance?.PlayClick(); g.ResumeGame(); }
             GUILayout.Space(10);
-            if (GUILayout.Button("🔄  MAIN LAGI", btnStyle, GUILayout.Height(h * 0.08f)))
+            if (GUILayout.Button("🔄  MAIN LAGI", btnStyle, GUILayout.Height(H * .085f)))
             { SoundManager.Instance?.PlayClick(); g.StartGame(); }
             GUILayout.Space(10);
             bool snd = SoundManager.Instance != null && SoundManager.Instance.SoundEnabled;
-            if (GUILayout.Button(snd ? "🔊  SUARA: AKTIF" : "🔇  SUARA: MATI", btnStyle, GUILayout.Height(h * 0.07f)))
+            if (GUILayout.Button(snd ? "🔊  SUARA: ON" : "🔇  SUARA: OFF", btnStyle, GUILayout.Height(H * .072f)))
             {
                 if (SoundManager.Instance != null) { SoundManager.Instance.SoundEnabled = !snd; SoundManager.Instance.PlayClick(); }
             }
             GUILayout.EndArea();
         }
 
+        // ── Game Over ─────────────────────────────────────────────────────────
         private void DrawGameOver(JungleDashGame g)
         {
-            float w = Screen.width, h = Screen.height;
-            float pw = Mathf.Min(w * 0.85f, 500f), ph = Mathf.Min(h * 0.78f, 560f);
-            Rect r = new Rect((w - pw) * 0.5f, (h - ph) * 0.5f, pw, ph);
-            GUI.Box(r, "", cardStyle);
-            GUILayout.BeginArea(r);
-            GUILayout.Space(20);
-            GUILayout.Label("💀  GAME OVER", titleStyle);
-            GUILayout.Space(12);
-            if (g.IsNewHighScore)
-                GUILayout.Label("🎉 SKOR TERTINGGI BARU! 🎉", subStyle);
+            float W = Screen.width, H = Screen.height;
+            float pw = Mathf.Min(W * .88f, 520f), ph = Mathf.Min(H * .80f, 580f);
+            Rect  r  = Centre(W, H, pw, ph);
+            GUI.Box(r, "", panelStyle);
+            GUILayout.BeginArea(Inset(r, 18));
+            GUILayout.Space(18);
+            GUILayout.Label("💀  GAME OVER  💀", titleStyle);
             GUILayout.Space(8);
-            GUILayout.BeginVertical(GUI.skin.box);
-            GUILayout.Label($"⭐ Skor: {g.Score:#,0}", hudStyle);
-            GUILayout.Label($"🏃 Jarak: {Mathf.FloorToInt(g.Distance)} meter", hudStyle);
-            GUILayout.Label($"🪙 Koin: {g.Coins}", hudStyle);
-            GUILayout.Label($"🏆 Tertinggi: {g.HighScore:#,0}", hudStyle);
+            if (g.IsNewHighScore) GUILayout.Label("✨  REKOR BARU!  ✨", subtitleStyle);
+            GUILayout.Space(6);
+
+            GUI.Box(GUILayoutUtility.GetRect(pw - 36, H * .24f), "", panelStyle);
+            GUILayout.Space(-H * .24f);
+            GUILayout.BeginVertical();
+            GUILayout.Space(4);
+            GUILayout.Label($"  ⭐  Skor:     {g.Score:#,0}",               bodyStyle);
+            GUILayout.Label($"  🏃  Jarak:    {Mathf.FloorToInt(g.Distance)} meter", bodyStyle);
+            GUILayout.Label($"  🪙  Koin:     {g.Coins}",                   bodyStyle);
+            GUILayout.Label($"  🏆  Rekor:    {g.HighScore:#,0}",           bodyStyle);
             GUILayout.EndVertical();
+
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("🔄  MAIN LAGI", btnStyle, GUILayout.Height(h * 0.09f)))
+            if (GUILayout.Button("🔄  MAIN LAGI", btnStyle, GUILayout.Height(H * .095f)))
             { SoundManager.Instance?.PlayClick(); g.StartGame(); }
             GUILayout.Space(10);
-            if (GUILayout.Button("🏠  MENU UTAMA", btnStyle, GUILayout.Height(h * 0.07f)))
+            if (GUILayout.Button("🏠  MENU UTAMA", btnStyle, GUILayout.Height(H * .072f)))
             { SoundManager.Instance?.PlayClick(); g.ShowMenu(); }
             GUILayout.Space(14);
             GUILayout.EndArea();
         }
+
+        // ── Layout helpers ────────────────────────────────────────────────────
+        private static Rect Centre(float W, float H, float w, float h) =>
+            new Rect((W - w) * .5f, (H - h) * .5f, w, h);
+
+        private static Rect Inset(Rect r, float pad) =>
+            new Rect(r.x + pad, r.y + pad, r.width - pad * 2f, r.height - pad * 2f);
     }
 }
