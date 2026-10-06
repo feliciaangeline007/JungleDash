@@ -1,52 +1,81 @@
+// Collectible.cs
+// Shared script for coins and gems.
+// Registers itself with PowerUpManager for magnet pull.
+// Spins in place. No per-frame allocations.
 using UnityEngine;
 
-namespace JungleDash
+public class Collectible : MonoBehaviour
 {
-    public enum CollectibleType { Coin, Gem, PowerUp }
+    // ─────────────────────────────────────────────
+    //  Inspector
+    // ─────────────────────────────────────────────
+    [Header("Value")]
+    [Tooltip("Score points awarded when collected.")]
+    public int points    = 10;
+    [Tooltip("Number of coins this counts as (gems = 5).")]
+    public int coinValue = 1;
 
-    public class Collectible : MonoBehaviour
+    [Header("Visuals")]
+    [Tooltip("Rotation speed (degrees/sec).")]
+    public float spinSpeed = 120f;
+    [Tooltip("Bob amplitude in world units.")]
+    public float bobAmp    = 0.12f;
+    [Tooltip("Bob frequency in Hz.")]
+    public float bobFreq   = 1.5f;
+
+    // ─────────────────────────────────────────────
+    //  Internal
+    // ─────────────────────────────────────────────
+    private float _spawnY;
+    private float _timeOffset;
+    private bool  _collected;
+
+    // ─────────────────────────────────────────────
+    //  Unity lifecycle
+    // ─────────────────────────────────────────────
+    private void OnEnable()
     {
-        public CollectibleType Type;
-        public PowerUpType PowerUpVariant;
-        public bool IsCollected { get; private set; }
+        _collected  = false;
+        _spawnY     = transform.position.y;
+        _timeOffset = Random.value * 6.28f; // desync bob
+        if (PowerUpManager.Instance != null)
+            PowerUpManager.Instance.RegisterCollectible(this);
+    }
 
-        // BUG FIX: store the spawn Y in world space, not local space.
-        // Using localPosition.y caused coins to drift underground when the
-        // segment parent moved, or snap when the game restarted.
-        private float baseWorldY;
-        private float bobPhase;
-        private bool  initialized;
+    private void OnDisable()
+    {
+        if (PowerUpManager.Instance != null)
+            PowerUpManager.Instance.UnregisterCollectible(this);
+    }
 
-        private void Start()
-        {
-            baseWorldY  = transform.position.y;
-            bobPhase    = Random.Range(0f, Mathf.PI * 2f); // stagger so they don't all bob together
-            initialized = true;
-        }
+    private void Update()
+    {
+        if (_collected) return;
+        // Spin
+        transform.Rotate(0f, spinSpeed * Time.deltaTime, 0f, Space.World);
+        // Bob
+        float y = _spawnY + Mathf.Sin(Time.time * bobFreq * Mathf.PI * 2f + _timeOffset) * bobAmp;
+        Vector3 p = transform.position;
+        p.y = y;
+        transform.position = p;
+    }
 
-        private void Update()
-        {
-            if (IsCollected || !initialized) return;
+    // ─────────────────────────────────────────────
+    //  Collection
+    // ─────────────────────────────────────────────
 
-            // Spin around world-up axis
-            transform.Rotate(0f, 180f * Time.deltaTime, 0f, Space.World);
+    /// <summary>Called by PlayerRunner on trigger or by Magnet when close enough.</summary>
+    public void Collect()
+    {
+        if (_collected) return;
+        _collected = true;
+        if (GameManager.Instance != null)
+            GameManager.Instance.AddPickup(points, coinValue);
+        gameObject.SetActive(false);
+    }
 
-            // Bob in world space (not local)
-            bobPhase += Time.deltaTime * 3.5f;
-            Vector3 p = transform.position;
-            p.y = baseWorldY + Mathf.Sin(bobPhase) * 0.18f;
-            transform.position = p;
-        }
-
-        public void PullTowards(Vector3 worldTarget, float speed)
-        {
-            transform.position = Vector3.MoveTowards(transform.position, worldTarget, speed * Time.deltaTime);
-        }
-
-        public void Collect()
-        {
-            IsCollected = true;
-            gameObject.SetActive(false);
-        }
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Player")) Collect();
     }
 }

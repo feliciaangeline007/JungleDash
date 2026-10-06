@@ -1,21 +1,54 @@
+// Obstacle.cs
+// Marks an object as a fatal obstacle.
+// Provides Hide() and TriggerDebris() for shield interaction.
+// No per-frame logic needed.
 using UnityEngine;
 
-namespace JungleDash
+public class Obstacle : MonoBehaviour
 {
-    public enum ObstacleType { Rock, FallenLog, AncientPillar, LowBarrier }
+    // ─────────────────────────────────────────────
+    //  Inspector
+    // ─────────────────────────────────────────────
+    [Header("Visuals")]
+    [Tooltip("The visual mesh renderer to hide on shield hit.")]
+    public Renderer obstacleRenderer;
+    [Tooltip("Debris particle system child to play on shield hit.")]
+    public ParticleSystem debrisParticles;
 
-    public class Obstacle : MonoBehaviour
+    // ─────────────────────────────────────────────
+    //  Internal
+    // ─────────────────────────────────────────────
+    private Collider _col;
+
+    private void Awake()
     {
-        public ObstacleType Type;
-        public float Height;
-        public bool CanJumpOver => Height < 1.35f;
+        _col = GetComponent<Collider>();
+    }
 
-        public void Initialize(ObstacleType type, float height)
-        {
-            Type = type;
-            Height = height;
-        }
+    // ─────────────────────────────────────────────
+    //  Public API
+    // ─────────────────────────────────────────────
 
-        public void BreakObstacle() => gameObject.SetActive(false);
+    /// <summary>Hide the visual and disable the collider after a shield hit.</summary>
+    public void Hide()
+    {
+        if (obstacleRenderer != null) obstacleRenderer.enabled = false;
+        if (_col             != null) _col.enabled             = false;
+    }
+
+    /// <summary>Play the debris burst particle effect.</summary>
+    public void TriggerDebris()
+    {
+        if (debrisParticles != null) debrisParticles.Play();
+    }
+
+    /// <summary>
+    /// Called by TrackSpawner when this obstacle is recycled from pool.
+    /// Restores visibility and collider so it can be reused.
+    /// </summary>
+    public void ResetObstacle()
+    {
+        if (obstacleRenderer != null) obstacleRenderer.enabled = true;
+        if (_col             != null) _col.enabled             = true;
     }
 }

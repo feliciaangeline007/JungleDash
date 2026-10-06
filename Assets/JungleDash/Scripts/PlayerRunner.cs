@@ -1,297 +1,356 @@
-// PlayerRunner.cs – Temple Run-style player controller
-// Uses Ethan FBX if available, otherwise procedural adventurer mesh.
-// Supports lane-switch, jump, and slide.
-using System;
+// PlayerRunner.cs
+// Drives the player via CharacterController.
+// Handles lane switching, jumping, input (touch swipe + keyboard + mouse drag),
+// fly state, and reports distance to GameManager.
+// No per-frame allocations.
 using UnityEngine;
 
-namespace JungleDash
+[RequireComponent(typeof(CharacterController))]
+public class PlayerRunner : MonoBehaviour
 {
-    public class PlayerRunner : MonoBehaviour
+    // ─────────────────────────────────────────────
+    //  Inspector: movement
+    // ─────────────────────────────────────────────
+    [Header("Speed")]
+    [Tooltip("Starting forward speed (units/sec).")]
+    public float startSpeed     = 8f;
+    [Tooltip("Maximum forward speed (units/sec).")]
+    public float maxSpeed       = 20f;
+    [Tooltip("How many units/sec² the speed increases.")]
+    public float acceleration   = 0.5f;
+
+    [Header("Lanes")]
+    [Tooltip("Lateral distance between lane centres.")]
+    public float laneWidth      = 2.0f;
+    [Tooltip("Seconds to slide between lanes.")]
+    public float laneChangeTime = 0.18f;
+
+    [Header("Jump")]
+    [Tooltip("Initial upward velocity when jumping.")]
+    public float jumpVelocity   = 10f;
+    [Tooltip("Gravity applied while airborne.")]
+    public float gravity        = -22f;
+    [Tooltip("Jump buffer window in seconds.")]
+    public float jumpBuffer     = 0.12f;
+
+    [Header("Swipe Input")]
+    [Tooltip("Fraction of screen height required to register a swipe.")]
+    [Range(0.02f, 0.2f)]
+    public float swipeThreshold = 0.06f;
+
+    [Header("Animation")]
+    [Tooltip("Optional Animator on the character model child.")]
+    public Animator characterAnimator;
+
+    // ─────────────────────────────────────────────
+    //  Internal
+    // ─────────────────────────────────────────────
+    private CharacterController _cc;
+    private float _currentSpeed;
+    private int   _currentLane;          // -1, 0, +1
+    private float _targetX;
+    private float _laneVelocity;         // SmoothDamp ref
+    private float _vertVelocity;
+    private float _jumpBufferTimer;
+    private bool  _wasGrounded;
+
+    // Fly state
+    private float _groundY;             // Y of ground at game start
+    private bool  _flyGrounded = true;  // true once landed after fly
+
+    // Touch / mouse input (no alloc: single finger tracking)
+    private bool  _touchActive;
+    private Vector2 _touchStart;
+    private bool  _swipeFired;
+
+    // Animator parameter detection
+    private bool _hasAnimator;
+    private bool _jumpParamIsBool;
+    private static readonly int _fwdHash    = Animator.StringToHash("Forward");
+    private static readonly int _groundHash = Animator.StringToHash("OnGround");
+    private static readonly int _jumpHash   = Animator.StringToHash("Jump");
+
+    // Distance dirty tracking
+    private float _distanceThisFrame;
+
+    // ─────────────────────────────────────────────
+    //  Unity lifecycle
+    // ─────────────────────────────────────────────
+    private void Awake()
     {
-        // Lane positions - mirrors TrackSpawner.LaneX
-        // FIX: define locally to avoid circular static dependency at startup
-        public static readonly float[] LaneX = { -TrackSpawner.LaneW, 0f, TrackSpawner.LaneW };
+        _cc = GetComponent<CharacterController>();
+    }
 
-        // ── Tuning ────────────────────────────────────────────────────────────
-        public float laneSpeed    = 16f;
-        public float jumpPower    = 11.5f;
-        public float gravity      = -30f;
-        public float flyHeight    = 2.8f;
-        public float slideTime    = 0.55f;
+    private void Start()
+    {
+        _currentSpeed = startSpeed;
+        _currentLane  = 0;
+        _targetX      = 0f;
+        _groundY      = transform.position.y;
 
-        // ── State ─────────────────────────────────────────────────────────────
-        public int  lane       = 1;
-        public bool grounded   = true;
-        public bool running    = false;
-        public bool sliding    = false;
-
-        private float targetX;
-        private float currentX;
-        private float velY;
-        private float currentY;
-        private float slideTimer;
-        private float runTime;    // for procedural leg animation
-
-        private GameObject visual;
-        private GameObject shieldFx;
-
-        // Leg parts for procedural run animation
-        private Transform legL, legR, armL, armR;
-
-        public event Action             OnCrash;
-        public event Action<Collectible> OnCollected;
-
-        // ── Bootstrap ─────────────────────────────────────────────────────────
-        private void Awake()
+        // Animator detection – determine Jump parameter type once
+        _hasAnimator = characterAnimator != null;
+        if (_hasAnimator)
         {
-            BuildVisual();
-            BuildShieldFx();
-            EnsureCollider();
+            characterAnimator.applyRootMotion = false;
+            _jumpParamIsBool = false;
+            foreach (var param in characterAnimator.parameters)
+            {
+                if (param.nameHash == _jumpHash)
+                {
+                    _jumpParamIsBool = param.type == AnimatorControllerParameterType.Bool;
+                    break;
+                }
+            }
         }
 
-        private void BuildVisual()
+        // Ensure tag
+        if (!gameObject.CompareTag("Player"))
+            Debug.LogWarning("[PlayerRunner] GameObject is not tagged 'Player'. Tag it for trigger detection.");
+    }
+
+    private void Update()
+    {
+        if (GameManager.Instance == null || !GameManager.Instance.IsRunning) return;
+
+        float dt = Time.deltaTime;
+
+        // 1. Accelerate
+        _currentSpeed = Mathf.Min(_currentSpeed + acceleration * dt, maxSpeed);
+
+        // Apply speed boost from power-up
+        float boostedSpeed = _currentSpeed;
+        if (PowerUpManager.Instance != null)
         {
-            // Attempt Ethan from Resources
-            var ethan = Resources.Load<GameObject>("Ethan");
-            if (ethan != null)
+            float bonus = PowerUpManager.Instance.SpeedBonusFraction;
+            boostedSpeed *= (1f + bonus);
+            PowerUpManager.Instance.SetPlayerSpeed(boostedSpeed);
+        }
+
+        // 2. Input
+        ReadInput();
+
+        // 3. Jump buffer
+        _jumpBufferTimer = Mathf.Max(0f, _jumpBufferTimer - dt);
+
+        // 4. Grounded check
+        bool grounded = _cc.isGrounded;
+
+        // 5. Vertical velocity
+        bool flyActive = PowerUpManager.Instance != null && PowerUpManager.Instance.FlyActive;
+
+        if (flyActive)
+        {
+            HandleFlyVertical(dt);
+        }
+        else
+        {
+            if (!_flyGrounded)
             {
-                visual = Instantiate(ethan, transform);
-                visual.transform.localPosition = Vector3.zero;
-                visual.transform.localRotation = Quaternion.identity;
-                visual.transform.localScale    = Vector3.one;
-                // Disable Ethan's own physics / colliders
-                var rb = visual.GetComponent<Rigidbody>();
-                if (rb) { rb.isKinematic = true; rb.useGravity = false; }
-                foreach (var col in visual.GetComponentsInChildren<Collider>()) col.enabled = false;
-                return;
+                // Just finished fly – land cleanly
+                _flyGrounded = true;
             }
 
-            // Procedural adventurer character
-            visual = new GameObject("RunnerMesh");
-            visual.transform.SetParent(transform, false);
-
-            var body  = MatFactory.Opaque(new Color(.85f, .38f, .12f), 0f, .25f);  // orange jacket
-            var pants = MatFactory.Opaque(new Color(.20f, .18f, .15f), 0f, .20f);  // dark trousers
-            var skin  = MatFactory.Opaque(new Color(.80f, .60f, .42f), 0f, .15f);  // skin tone
-            var boot  = MatFactory.Opaque(new Color(.14f, .10f, .07f), 0f, .30f);  // leather boots
-            var hat   = MatFactory.Opaque(new Color(.44f, .28f, .08f), 0f, .20f);  // explorer hat
-            var pack  = MatFactory.Opaque(new Color(.30f, .22f, .10f), 0f, .20f);  // backpack
-
-            // Torso
-            AddMeshPart(PrimitiveType.Capsule, new Vector3(0f, 1.05f, 0f), new Vector3(.52f, .48f, .42f), body);
-            // Head
-            AddMeshPart(PrimitiveType.Sphere,  new Vector3(0f, 1.72f, 0f), Vector3.one * .44f, skin);
-            // Hat brim
-            AddMeshPart(PrimitiveType.Cylinder,new Vector3(0f, 1.95f, 0f), new Vector3(.70f, .055f, .70f), hat);
-            // Hat crown
-            AddMeshPart(PrimitiveType.Cylinder,new Vector3(0f, 2.12f, 0f), new Vector3(.46f, .16f, .46f), hat);
-            // Belt / hips
-            AddMeshPart(PrimitiveType.Cube,    new Vector3(0f, .70f, 0f), new Vector3(.50f, .20f, .40f), pants);
-            // Backpack
-            AddMeshPart(PrimitiveType.Cube,    new Vector3(0f, 1.1f, -.26f), new Vector3(.36f, .44f, .20f), pack);
-
-            // Legs (stored for animation)
-            legL = AddMeshPartTf(PrimitiveType.Capsule, new Vector3(-.15f, .28f, 0f), new Vector3(.22f, .36f, .22f), pants);
-            legR = AddMeshPartTf(PrimitiveType.Capsule, new Vector3( .15f, .28f, 0f), new Vector3(.22f, .36f, .22f), pants);
-            AddMeshPart(PrimitiveType.Cube, new Vector3(-.15f, .06f, .04f), new Vector3(.24f, .12f, .32f), boot);
-            AddMeshPart(PrimitiveType.Cube, new Vector3( .15f, .06f, .04f), new Vector3(.24f, .12f, .32f), boot);
-
-            // Arms (stored for animation)
-            armL = AddMeshPartTf(PrimitiveType.Capsule, new Vector3(-.42f, 1.05f, 0f), new Vector3(.20f, .30f, .20f), skin);
-            armR = AddMeshPartTf(PrimitiveType.Capsule, new Vector3( .42f, 1.05f, 0f), new Vector3(.20f, .30f, .20f), skin);
-        }
-
-        private void AddMeshPart(PrimitiveType t, Vector3 p, Vector3 s, Material m)
-        {
-            var go = GameObject.CreatePrimitive(t);
-            go.transform.SetParent(visual.transform, false);
-            go.transform.localPosition = p;
-            go.transform.localScale    = s;
-            go.GetComponent<Renderer>().sharedMaterial = m;
-            Destroy(go.GetComponent<Collider>());
-        }
-
-        private Transform AddMeshPartTf(PrimitiveType t, Vector3 p, Vector3 s, Material m)
-        {
-            AddMeshPart(t, p, s, m);
-            return visual.transform.GetChild(visual.transform.childCount - 1);
-        }
-
-        private void BuildShieldFx()
-        {
-            shieldFx = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            shieldFx.name = "ShieldFx";
-            shieldFx.transform.SetParent(transform, false);
-            shieldFx.transform.localPosition = new Vector3(0f, 1f, 0f);
-            shieldFx.transform.localScale    = Vector3.one * 2.5f;
-            Destroy(shieldFx.GetComponent<Collider>());
-            shieldFx.GetComponent<Renderer>().sharedMaterial =
-                MatFactory.Glow(new Color(.2f, .85f, 1f), 1.5f);
-            shieldFx.SetActive(false);
-        }
-
-        private void EnsureCollider()
-        {
-            var col = GetComponent<CapsuleCollider>() ?? gameObject.AddComponent<CapsuleCollider>();
-            col.center    = new Vector3(0f, .85f, 0f);
-            col.radius    = 0.38f;
-            col.height    = 1.7f;
-            col.isTrigger = true;
-        }
-
-        // ── Control ───────────────────────────────────────────────────────────
-        public void StartRun()
-        {
-            running   = true;
-            sliding   = false;
-            lane      = 1;
-            targetX   = currentX = LaneX[1];
-            currentY  = velY = 0f;
-            grounded  = true;
-            runTime   = 0f;
-            transform.position = new Vector3(currentX, 0f, 0f);
-            ResizeCollider(false);
-        }
-
-        public void StopRun()
-        {
-            running = false;
-        }
-
-        public void MoveLeft()
-        {
-            if (!running || lane <= 0) return;
-            lane--;
-            targetX = LaneX[lane];
-        }
-
-        public void MoveRight()
-        {
-            if (!running || lane >= 2) return;
-            lane++;
-            targetX = LaneX[lane];
-        }
-
-        public void Jump()
-        {
-            if (!running || !grounded) return;
-            velY     = jumpPower;
-            grounded = false;
-            if (sliding) { sliding = false; ResizeCollider(false); }
-            SoundManager.Instance?.PlayJump();
-        }
-
-        public void Slide()
-        {
-            if (!running || !grounded) return;
-            sliding    = true;
-            slideTimer = slideTime;
-            ResizeCollider(true);
-            SoundManager.Instance?.PlayJump(); // reuse whoosh
-        }
-
-        private void ResizeCollider(bool slim)
-        {
-            var col = GetComponent<CapsuleCollider>();
-            if (col == null) return;
-            col.center = slim ? new Vector3(0f, .45f, 0f) : new Vector3(0f, .85f, 0f);
-            col.height = slim ? .90f : 1.70f;
-        }
-
-        // ── Update ────────────────────────────────────────────────────────────
-        private void Update()
-        {
-            float dt = Time.deltaTime;
-            currentX = Mathf.Lerp(currentX, targetX, dt * laneSpeed);
-
-            // Slide countdown
-            if (sliding)
+            if (grounded)
             {
-                slideTimer -= dt;
-                if (slideTimer <= 0f) { sliding = false; ResizeCollider(false); }
-            }
-
-            bool flying = PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.Fly);
-            if (flying)
-            {
-                currentY = Mathf.Lerp(currentY, flyHeight, dt * 6f);
-                velY     = 0f;
-                grounded = false;
+                if (_vertVelocity < 0f) _vertVelocity = -2f; // small push to keep grounded
+                if (_jumpBufferTimer > 0f)
+                {
+                    _vertVelocity    = jumpVelocity;
+                    _jumpBufferTimer = 0f;
+                }
             }
             else
             {
-                if (!grounded)
-                {
-                    velY     += gravity * dt;
-                    currentY += velY * dt;
-                    if (currentY <= 0f) { currentY = velY = 0f; grounded = true; }
-                }
-            }
-
-            transform.position = new Vector3(currentX, currentY, transform.position.z);
-
-            // Shield fx
-            bool hasShield = PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.Shield);
-            if (shieldFx != null && shieldFx.activeSelf != hasShield) shieldFx.SetActive(hasShield);
-            if (hasShield && shieldFx != null)
-                shieldFx.transform.localScale = Vector3.one * (2.4f + Mathf.Sin(Time.time * 7f) * .15f);
-
-            // Procedural run animation (only when no animator)
-            if (running && legL != null)
-            {
-                runTime += dt * 8f;
-                float swing = Mathf.Sin(runTime) * 22f;
-                legL.localRotation  = Quaternion.Euler( swing, 0f, 0f);
-                legR.localRotation  = Quaternion.Euler(-swing, 0f, 0f);
-                if (armL != null) armL.localRotation = Quaternion.Euler(-swing * .6f, 0f, 12f);
-                if (armR != null) armR.localRotation = Quaternion.Euler( swing * .6f, 0f, -12f);
-            }
-
-            // Crouch visual for slide
-            if (visual != null)
-            {
-                float targetSY = sliding ? .6f : 1f;
-                Vector3 sc     = visual.transform.localScale;
-                sc.y = Mathf.Lerp(sc.y, targetSY, dt * 12f);
-                visual.transform.localScale = sc;
-            }
-
-            // Magnet sweep
-            if (running && PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.Magnet))
-            {
-                foreach (var hit in Physics.OverlapSphere(transform.position, 10f))
-                {
-                    var c = hit.GetComponent<Collectible>();
-                    if (c != null && !c.IsCollected && c.Type != CollectibleType.PowerUp)
-                        c.PullTowards(transform.position + Vector3.up * .8f, 20f);
-                }
+                _vertVelocity += gravity * dt;
             }
         }
 
-        // ── Collision ─────────────────────────────────────────────────────────
-        private void OnTriggerEnter(Collider other)
-        {
-            if (!running) return;
+        // 6. Lateral movement (smooth)
+        float posX = Mathf.SmoothDamp(transform.position.x, _targetX,
+                                      ref _laneVelocity, laneChangeTime);
 
-            var collectible = other.GetComponent<Collectible>();
-            if (collectible != null && !collectible.IsCollected)
+        // 7. Move
+        Vector3 move = new Vector3(
+            posX - transform.position.x,
+            _vertVelocity * dt,
+            boostedSpeed  * dt
+        );
+        _cc.Move(move);
+
+        // 8. Distance score
+        _distanceThisFrame = boostedSpeed * dt;
+        if (GameManager.Instance != null)
+            GameManager.Instance.AddDistance(_distanceThisFrame);
+
+        // 9. Animator
+        if (_hasAnimator)
+        {
+            characterAnimator.SetFloat(_fwdHash, 1f);
+            characterAnimator.SetBool(_groundHash, grounded || flyActive);
+            SetJumpParam(grounded ? 0f : Mathf.Max(0f, _vertVelocity));
+        }
+
+        _wasGrounded = grounded;
+
+        // Update fly grounded tracking
+        if (flyActive) _flyGrounded = false;
+    }
+
+    // ─────────────────────────────────────────────
+    //  Fly vertical logic
+    // ─────────────────────────────────────────────
+    private void HandleFlyVertical(float dt)
+    {
+        float targetY = _groundY + PowerUpManager.Instance.FlyHeightOffset;
+        float currentY = transform.position.y;
+        // Smoothly move toward target height
+        float newY  = Mathf.MoveTowards(currentY, targetY, flyVSpeed * dt);
+        _vertVelocity = (newY - currentY) / dt;
+    }
+    [Tooltip("Vertical speed during fly lerp (units/sec).")]
+    [SerializeField] private float flyVSpeed = 2.5f;
+
+    // ─────────────────────────────────────────────
+    //  Input
+    // ─────────────────────────────────────────────
+    private void ReadInput()
+    {
+        // Touch
+        if (Input.touchCount > 0)
+        {
+            Touch t = Input.GetTouch(0);
+            if (t.phase == TouchPhase.Began)
             {
-                collectible.Collect();
-                OnCollected?.Invoke(collectible);
+                _touchStart  = t.position;
+                _touchActive = true;
+                _swipeFired  = false;
+            }
+            else if (_touchActive && !_swipeFired && t.phase == TouchPhase.Moved)
+            {
+                EvaluateSwipe(t.position - _touchStart);
+            }
+            else if (t.phase == TouchPhase.Ended || t.phase == TouchPhase.Canceled)
+            {
+                _touchActive = false;
+            }
+        }
+        // Mouse drag (editor)
+        else if (Input.GetMouseButtonDown(0))
+        {
+            _touchStart  = Input.mousePosition;
+            _touchActive = true;
+            _swipeFired  = false;
+        }
+        else if (_touchActive && !_swipeFired && Input.GetMouseButton(0))
+        {
+            EvaluateSwipe((Vector2)Input.mousePosition - _touchStart);
+        }
+        else if (Input.GetMouseButtonUp(0))
+        {
+            _touchActive = false;
+        }
+
+        // Keyboard fallback
+        if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))  SwitchLane(-1);
+        if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) SwitchLane(+1);
+        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W) ||
+            Input.GetKeyDown(KeyCode.UpArrow)) QueueJump();
+    }
+
+    private void EvaluateSwipe(Vector2 delta)
+    {
+        float thresh = Screen.height * swipeThreshold;
+        if (Mathf.Abs(delta.x) > Mathf.Abs(delta.y))
+        {
+            if (Mathf.Abs(delta.x) >= thresh)
+            {
+                SwitchLane(delta.x > 0 ? +1 : -1);
+                _swipeFired = true;
+            }
+        }
+        else
+        {
+            if (delta.y >= thresh)
+            {
+                QueueJump();
+                _swipeFired = true;
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    //  Lane / jump helpers
+    // ─────────────────────────────────────────────
+    private void SwitchLane(int dir)
+    {
+        bool flyActive = PowerUpManager.Instance != null && PowerUpManager.Instance.FlyActive;
+        if (flyActive) return; // no lane-change during fly? optional; allow it for fun
+        _currentLane = Mathf.Clamp(_currentLane + dir, -1, 1);
+        _targetX     = _currentLane * laneWidth;
+    }
+
+    private void QueueJump()
+    {
+        bool flyActive = PowerUpManager.Instance != null && PowerUpManager.Instance.FlyActive;
+        if (flyActive) return; // cannot jump while flying
+        _jumpBufferTimer = jumpBuffer;
+    }
+
+    // ─────────────────────────────────────────────
+    //  Obstacle / pickup trigger
+    // ─────────────────────────────────────────────
+    private void OnTriggerEnter(Collider other)
+    {
+        // Collectibles
+        Collectible col = other.GetComponent<Collectible>();
+        if (col != null)
+        {
+            col.Collect();
+            return;
+        }
+
+        // Power-up pickups
+        PowerUpPickup pup = other.GetComponent<PowerUpPickup>();
+        if (pup != null)
+        {
+            pup.Collect();
+            return;
+        }
+
+        // Obstacles
+        Obstacle obs = other.GetComponent<Obstacle>();
+        if (obs != null)
+        {
+            // Fly = invulnerable
+            bool flyActive = PowerUpManager.Instance != null
+                             && PowerUpManager.Instance.FlyActive;
+            if (flyActive) return;
+
+            // Shield absorb
+            if (PowerUpManager.Instance != null
+                && PowerUpManager.Instance.TryConsumeShield())
+            {
+                obs.TriggerDebris();
+                obs.Hide();
                 return;
             }
 
-            var obstacle = other.GetComponent<Obstacle>();
-            if (obstacle == null) return;
-
-            var pm = PowerUpManager.Instance;
-            if (pm != null && pm.IsActive(PowerUpType.SpeedBoost)) { obstacle.BreakObstacle(); return; }
-            if (pm != null && pm.IsActive(PowerUpType.Shield))     { pm.ConsumeShield(); obstacle.BreakObstacle(); return; }
-            if (pm != null && pm.IsActive(PowerUpType.Fly))        return;
-
-            running = false;
-            SoundManager.Instance?.PlayCrash();
-            OnCrash?.Invoke();
+            // Game over
+            if (GameManager.Instance != null)
+                GameManager.Instance.TriggerGameOver();
         }
+    }
+
+    // ─────────────────────────────────────────────
+    //  Animator helper
+    // ─────────────────────────────────────────────
+    private void SetJumpParam(float value)
+    {
+        if (!_hasAnimator) return;
+        if (_jumpParamIsBool)
+            characterAnimator.SetBool(_jumpHash, value > 0.1f);
+        else
+            characterAnimator.SetFloat(_jumpHash, value);
     }
 }
