@@ -8,125 +8,174 @@ namespace JungleDash
         public static readonly float[] LaneX = { -2.6f, 0f, 2.6f };
 
         public float laneChangeSpeed = 14f;
-        public float jumpPower = 12.5f;
-        public float gravity = -28f;
-        public float flyHeight = 2.4f;
+        public float jumpPower       = 12.5f;
+        public float gravity         = -28f;
+        public float flyHeight       = 2.4f;
 
-        public int currentLane = 1;
-        public bool isGrounded = true;
-        public bool isRunning = false;
+        public int  currentLane = 1;
+        public bool isGrounded  = true;
+        public bool isRunning   = false;
 
-        private float targetX = 0f;
-        private float currentX = 0f;
-        private float verticalVelocity = 0f;
-        private float currentY = 0f;
+        private float targetX;
+        private float currentX;
+        private float verticalVelocity;
+        private float currentY;
 
-        private Animator animator;
+        private Animator  animator;
         private GameObject characterVisual;
-        private GameObject shieldObject;
+        private GameObject shieldVisual;
 
-        public event Action OnCrash;
+        public event Action             OnCrash;
         public event Action<Collectible> OnCollected;
 
+        // ── Bootstrap ─────────────────────────────────────────────────────────
         private void Awake()
         {
-            BuildCharacterVisual();
-            BuildShieldVisual();
+            BuildVisual();
+            BuildShield();
             EnsureCollider();
         }
 
-        private void BuildCharacterVisual()
+        private static Shader SafeShader()
+        {
+            string[] names = {
+                "Universal Render Pipeline/Lit",
+                "Universal Render Pipeline/Simple Lit",
+                "Universal Render Pipeline/Unlit",
+                "Unlit/Color",
+                "Standard"
+            };
+            foreach (var n in names) { var s = Shader.Find(n); if (s != null) return s; }
+            return null;
+        }
+
+        private static Material ColorMat(Color c)
+        {
+            var sh = SafeShader();
+            var m  = sh != null ? new Material(sh) : new Material(Shader.Find("Diffuse") ?? Shader.Find("Standard"));
+            m.color = c;
+            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
+            return m;
+        }
+
+        private void BuildVisual()
         {
             // Try Ethan FBX from Resources
-            GameObject fbx = Resources.Load<GameObject>("Ethan");
+            var fbx = Resources.Load<GameObject>("Ethan");
             if (fbx != null)
             {
                 characterVisual = Instantiate(fbx, transform);
                 characterVisual.transform.localPosition = Vector3.zero;
                 characterVisual.transform.localRotation = Quaternion.identity;
+                characterVisual.transform.localScale    = Vector3.one;
+
                 var rb = characterVisual.GetComponent<Rigidbody>();
                 if (rb != null) { rb.isKinematic = true; rb.useGravity = false; }
-                var cc = characterVisual.GetComponent<Collider>();
-                if (cc != null) cc.enabled = false;
-                animator = characterVisual.GetComponent<Animator>();
+
+                // Disable all colliders on the visual – we use our own on the parent
+                foreach (var col in characterVisual.GetComponentsInChildren<Collider>())
+                    col.enabled = false;
+
+                animator = characterVisual.GetComponentInChildren<Animator>();
+                return;
             }
 
-            // Fallback: procedural capsule character
-            if (characterVisual == null)
-            {
-                characterVisual = new GameObject("RunnerVisual");
-                characterVisual.transform.SetParent(transform, false);
+            // Procedural character – looks like an adventurer in orange gear
+            characterVisual = new GameObject("RunnerVisual");
+            characterVisual.transform.SetParent(transform, false);
 
-                Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-                Material bodyMat = new Material(sh);
-                Color orange = new Color(0.92f, 0.44f, 0.2f);
-                bodyMat.color = orange;
-                if (bodyMat.HasProperty("_BaseColor")) bodyMat.SetColor("_BaseColor", orange);
+            var bodyMat   = ColorMat(new Color(0.88f, 0.40f, 0.15f)); // orange vest
+            var pantsMat  = ColorMat(new Color(0.25f, 0.22f, 0.18f)); // dark pants
+            var skinMat   = ColorMat(new Color(0.82f, 0.62f, 0.44f)); // skin
+            var shoesMat  = ColorMat(new Color(0.18f, 0.14f, 0.10f)); // dark shoes
+            var hairMat   = ColorMat(new Color(0.22f, 0.14f, 0.08f)); // hair
+            var hatMat    = ColorMat(new Color(0.50f, 0.32f, 0.10f)); // hat
 
-                Material skinMat = new Material(sh);
-                Color skin = new Color(0.8f, 0.55f, 0.38f);
-                skinMat.color = skin;
-                if (skinMat.HasProperty("_BaseColor")) skinMat.SetColor("_BaseColor", skin);
-
-                GameObject body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                body.transform.SetParent(characterVisual.transform, false);
-                body.transform.localPosition = new Vector3(0f, 0.95f, 0f);
-                body.transform.localScale = new Vector3(0.6f, 0.85f, 0.5f);
-                body.GetComponent<Renderer>().sharedMaterial = bodyMat;
-                Destroy(body.GetComponent<Collider>());
-
-                GameObject head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                head.transform.SetParent(characterVisual.transform, false);
-                head.transform.localPosition = new Vector3(0f, 1.65f, 0f);
-                head.transform.localScale = Vector3.one * 0.48f;
-                head.GetComponent<Renderer>().sharedMaterial = skinMat;
-                Destroy(head.GetComponent<Collider>());
-            }
+            // Torso (upper body)
+            AddPart(PrimitiveType.Capsule, new Vector3(0f, 1.08f, 0f), new Vector3(0.52f, 0.46f, 0.42f), bodyMat);
+            // Head
+            AddPart(PrimitiveType.Sphere,  new Vector3(0f, 1.72f, 0f), Vector3.one * 0.46f, skinMat);
+            // Hat brim
+            AddPart(PrimitiveType.Cylinder, new Vector3(0f, 1.98f, 0f), new Vector3(0.68f, 0.06f, 0.68f), hatMat);
+            // Hat top
+            AddPart(PrimitiveType.Cylinder, new Vector3(0f, 2.14f, 0f), new Vector3(0.46f, 0.18f, 0.46f), hatMat);
+            // Pelvis
+            AddPart(PrimitiveType.Cube, new Vector3(0f, 0.72f, 0f), new Vector3(0.48f, 0.22f, 0.38f), pantsMat);
+            // Left leg
+            AddPart(PrimitiveType.Capsule, new Vector3(-0.16f, 0.30f, 0f), new Vector3(0.22f, 0.36f, 0.22f), pantsMat);
+            // Right leg
+            AddPart(PrimitiveType.Capsule, new Vector3( 0.16f, 0.30f, 0f), new Vector3(0.22f, 0.36f, 0.22f), pantsMat);
+            // Left shoe
+            AddPart(PrimitiveType.Cube, new Vector3(-0.16f, 0.06f,  0.04f), new Vector3(0.24f, 0.12f, 0.32f), shoesMat);
+            // Right shoe
+            AddPart(PrimitiveType.Cube, new Vector3( 0.16f, 0.06f,  0.04f), new Vector3(0.24f, 0.12f, 0.32f), shoesMat);
+            // Left arm
+            AddPart(PrimitiveType.Capsule, new Vector3(-0.42f, 1.05f, 0f), new Vector3(0.20f, 0.32f, 0.20f), skinMat);
+            // Right arm
+            AddPart(PrimitiveType.Capsule, new Vector3( 0.42f, 1.05f, 0f), new Vector3(0.20f, 0.32f, 0.20f), skinMat);
+            // Backpack
+            AddPart(PrimitiveType.Cube, new Vector3(0f, 1.1f, -0.28f), new Vector3(0.36f, 0.44f, 0.22f), hatMat);
         }
 
-        private void BuildShieldVisual()
+        private void AddPart(PrimitiveType type, Vector3 pos, Vector3 scale, Material mat)
         {
-            shieldObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            shieldObject.name = "ShieldAura";
-            shieldObject.transform.SetParent(transform, false);
-            shieldObject.transform.localPosition = new Vector3(0f, 0.95f, 0f);
-            shieldObject.transform.localScale = Vector3.one * 2.3f;
-            Destroy(shieldObject.GetComponent<Collider>());
+            var go = GameObject.CreatePrimitive(type);
+            go.transform.SetParent(characterVisual.transform, false);
+            go.transform.localPosition = pos;
+            go.transform.localScale    = scale;
+            go.GetComponent<Renderer>().sharedMaterial = mat;
+            Destroy(go.GetComponent<Collider>());
+        }
 
-            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-            Material m = new Material(sh);
-            Color c = new Color(0.2f, 0.85f, 1f, 0.38f);
+        private void BuildShield()
+        {
+            shieldVisual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            shieldVisual.name = "ShieldAura";
+            shieldVisual.transform.SetParent(transform, false);
+            shieldVisual.transform.localPosition = new Vector3(0f, 1f, 0f);
+            shieldVisual.transform.localScale    = Vector3.one * 2.4f;
+            Destroy(shieldVisual.GetComponent<Collider>());
+
+            var sh = SafeShader() ?? Shader.Find("Standard");
+            var m  = new Material(sh);
+            var c  = new Color(0.2f, 0.85f, 1f, 0.32f);
             m.color = c;
-            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
-            shieldObject.GetComponent<Renderer>().sharedMaterial = m;
-            shieldObject.SetActive(false);
+            if (m.HasProperty("_BaseColor"))  m.SetColor("_BaseColor", c);
+            if (m.HasProperty("_EmissionColor"))
+            {
+                m.EnableKeyword("_EMISSION");
+                m.SetColor("_EmissionColor", new Color(0f, 0.6f, 1f) * 1.8f);
+            }
+            shieldVisual.GetComponent<Renderer>().sharedMaterial = m;
+            shieldVisual.SetActive(false);
         }
 
         private void EnsureCollider()
         {
             var col = GetComponent<CapsuleCollider>();
             if (col == null) col = gameObject.AddComponent<CapsuleCollider>();
-            col.center = new Vector3(0f, 0.9f, 0f);
-            col.radius = 0.4f;
-            col.height = 1.8f;
+            col.center  = new Vector3(0f, 0.9f, 0f);
+            col.radius  = 0.42f;
+            col.height  = 1.8f;
             col.isTrigger = true;
         }
 
+        // ── Control ───────────────────────────────────────────────────────────
         public void StartRun()
         {
-            isRunning = true;
+            isRunning  = true;
             currentLane = 1;
             targetX = currentX = LaneX[1];
             currentY = verticalVelocity = 0f;
             isGrounded = true;
             transform.position = new Vector3(currentX, 0f, 0f);
-            SetAnimRun(true);
+            SetAnim(true);
         }
 
         public void StopRun()
         {
             isRunning = false;
-            SetAnimRun(false);
+            SetAnim(false);
         }
 
         public void MoveLeft()
@@ -152,13 +201,14 @@ namespace JungleDash
             SoundManager.Instance?.PlayJump();
         }
 
-        private void SetAnimRun(bool running)
+        private void SetAnim(bool running)
         {
             if (animator == null) return;
             animator.SetFloat("Forward", running ? 1f : 0f);
             animator.SetBool("OnGround", true);
         }
 
+        // ── Update ────────────────────────────────────────────────────────────
         private void Update()
         {
             float dt = Time.deltaTime;
@@ -176,7 +226,7 @@ namespace JungleDash
                 if (!isGrounded)
                 {
                     verticalVelocity += gravity * dt;
-                    currentY += verticalVelocity * dt;
+                    currentY         += verticalVelocity * dt;
                     if (currentY <= 0f)
                     {
                         currentY = verticalVelocity = 0f;
@@ -188,25 +238,25 @@ namespace JungleDash
 
             transform.position = new Vector3(currentX, currentY, transform.position.z);
 
-            bool hasShield = PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.Shield);
-            if (shieldObject != null && shieldObject.activeSelf != hasShield)
-                shieldObject.SetActive(hasShield);
-            if (hasShield && shieldObject != null)
-                shieldObject.transform.localScale = Vector3.one * (2.2f + Mathf.Sin(Time.time * 6f) * 0.12f);
+            // Shield visual
+            bool shield = PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.Shield);
+            if (shieldVisual != null && shieldVisual.activeSelf != shield) shieldVisual.SetActive(shield);
+            if (shield && shieldVisual != null)
+                shieldVisual.transform.localScale = Vector3.one * (2.3f + Mathf.Sin(Time.time * 6f) * 0.14f);
 
-            // Magnet pull
+            // Magnet sweep
             if (isRunning && PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.Magnet))
             {
-                Collider[] hits = Physics.OverlapSphere(transform.position, 11f);
-                foreach (var h in hits)
+                foreach (var hit in Physics.OverlapSphere(transform.position, 11f))
                 {
-                    var col = h.GetComponent<Collectible>();
+                    var col = hit.GetComponent<Collectible>();
                     if (col != null && !col.IsCollected && col.Type != CollectibleType.PowerUp)
-                        col.PullTowards(transform.position + Vector3.up * 0.8f, 22f);
+                        col.PullTowards(transform.position + Vector3.up * 0.9f, 22f);
                 }
             }
         }
 
+        // ── Collision ─────────────────────────────────────────────────────────
         private void OnTriggerEnter(Collider other)
         {
             if (!isRunning) return;
@@ -220,26 +270,16 @@ namespace JungleDash
             }
 
             var obstacle = other.GetComponent<Obstacle>();
-            if (obstacle != null)
-            {
-                if (PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.SpeedBoost))
-                {
-                    obstacle.BreakObstacle();
-                    return;
-                }
-                if (PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.Shield))
-                {
-                    PowerUpManager.Instance.ConsumeShield();
-                    obstacle.BreakObstacle();
-                    return;
-                }
-                if (PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.Fly))
-                    return;
+            if (obstacle == null) return;
 
-                isRunning = false;
-                SoundManager.Instance?.PlayCrash();
-                OnCrash?.Invoke();
-            }
+            var pm = PowerUpManager.Instance;
+            if (pm != null && pm.IsActive(PowerUpType.SpeedBoost)) { obstacle.BreakObstacle(); return; }
+            if (pm != null && pm.IsActive(PowerUpType.Shield))     { pm.ConsumeShield(); obstacle.BreakObstacle(); return; }
+            if (pm != null && pm.IsActive(PowerUpType.Fly))        return;
+
+            isRunning = false;
+            SoundManager.Instance?.PlayCrash();
+            OnCrash?.Invoke();
         }
     }
 }

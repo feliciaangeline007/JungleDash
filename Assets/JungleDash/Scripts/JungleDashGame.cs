@@ -4,8 +4,8 @@ using JungleDash;
 public enum GameState { Menu, Playing, Paused, GameOver }
 
 /// <summary>
-/// Master coordinator for Jungle Dash (Unity 6000.6.3f1, Android, URP).
-/// Bootstraps all game systems at runtime — no prefabs or manual scene setup needed.
+/// Master coordinator for Jungle Dash (Unity 6000.6.3f1 · Android · URP).
+/// Bootstraps all game systems at runtime – no prefabs or manual scene setup needed.
 /// </summary>
 public class JungleDashGame : MonoBehaviour
 {
@@ -19,93 +19,92 @@ public class JungleDashGame : MonoBehaviour
     public TrackSpawner Spawner      { get; private set; }
     public CameraFollow CameraSystem { get; private set; }
 
-    public GameState CurrentState { get; private set; } = GameState.Menu;
-    public float CurrentSpeed     { get; private set; } = BaseSpeed;
-    public float Distance         { get; private set; }
-    public int   Score            { get; private set; }
-    public int   Coins            { get; private set; }
-    public int   HighScore        { get; private set; }
-    public int   TotalCoins       { get; private set; }
-    public bool  IsNewHighScore   { get; private set; }
+    public GameState CurrentState  { get; private set; } = GameState.Menu;
+    public float     CurrentSpeed  { get; private set; } = BaseSpeed;
+    public float     Distance      { get; private set; }
+    public int       Score         { get; private set; }
+    public int       Coins         { get; private set; }
+    public int       HighScore     { get; private set; }
+    public int       TotalCoins    { get; private set; }
+    public bool      IsNewHighScore{ get; private set; }
 
     private float distAcc;
     private int   pickupPts;
 
-    // ─── Lifecycle ─────────────────────────────────────────────────────────────
-
+    // ── Lifecycle ──────────────────────────────────────────────────────────────
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
-
         Application.targetFrameRate = 60;
-        HighScore   = PlayerPrefs.GetInt("JD_Hi", 0);
-        TotalCoins  = PlayerPrefs.GetInt("JD_Coins", 0);
-
+        HighScore  = PlayerPrefs.GetInt("JD_Hi",    0);
+        TotalCoins = PlayerPrefs.GetInt("JD_Coins", 0);
         SetupLighting();
         Bootstrap();
     }
 
     private void Start() => ShowMenu();
 
-    // ─── Setup ─────────────────────────────────────────────────────────────────
-
+    // ── Scene setup ───────────────────────────────────────────────────────────
     private void SetupLighting()
     {
-        RenderSettings.fog          = true;
-        RenderSettings.fogMode      = FogMode.Linear;
-        RenderSettings.fogColor     = new Color(0.68f, 0.82f, 0.58f);
-        RenderSettings.fogStartDistance = 35f;
-        RenderSettings.fogEndDistance   = 115f;
-        RenderSettings.ambientLight = new Color(0.65f, 0.75f, 0.55f);
+        // Lush jungle atmosphere
+        RenderSettings.fog              = true;
+        RenderSettings.fogMode          = FogMode.Linear;
+        RenderSettings.fogColor         = new Color(0.55f, 0.75f, 0.48f);
+        RenderSettings.fogStartDistance = 40f;
+        RenderSettings.fogEndDistance   = 120f;
+        RenderSettings.ambientLight     = new Color(0.60f, 0.72f, 0.50f);
+        RenderSettings.ambientIntensity = 1.1f;
 
+        // Configure the Directional Light already in the scene
         var light = Object.FindFirstObjectByType<Light>();
         if (light != null && light.type == LightType.Directional)
         {
-            light.color     = new Color(1f, 0.94f, 0.78f);
-            light.intensity = 1.3f;
+            light.color     = new Color(1.0f, 0.92f, 0.72f);   // warm sunlight
+            light.intensity = 1.4f;
             light.shadows   = LightShadows.Soft;
-            light.transform.rotation = Quaternion.Euler(46f, -32f, 0f);
+            light.shadowStrength = 0.55f;
+            light.transform.rotation = Quaternion.Euler(48f, -35f, 0f);
         }
     }
 
     private void Bootstrap()
     {
-        if (Object.FindFirstObjectByType<SoundManager>() == null)
-            new GameObject("SoundManager").AddComponent<SoundManager>();
+        // Ensure singletons exist
+        if (Object.FindFirstObjectByType<SoundManager>()   == null) new GameObject("SoundManager").AddComponent<SoundManager>();
+        if (Object.FindFirstObjectByType<PowerUpManager>() == null) new GameObject("PowerUpManager").AddComponent<PowerUpManager>();
+        if (Object.FindFirstObjectByType<UIManager>()      == null) new GameObject("UIManager").AddComponent<UIManager>();
 
-        if (Object.FindFirstObjectByType<PowerUpManager>() == null)
-            new GameObject("PowerUpManager").AddComponent<PowerUpManager>();
-
-        if (Object.FindFirstObjectByType<UIManager>() == null)
-            new GameObject("UIManager").AddComponent<UIManager>();
-
+        // Track
         var spawnerGO = new GameObject("TrackSpawner");
         Spawner = spawnerGO.AddComponent<TrackSpawner>();
 
+        // Player
         var playerGO = new GameObject("Player");
         Player = playerGO.AddComponent<PlayerRunner>();
         Player.OnCrash     += OnPlayerCrash;
         Player.OnCollected += OnPlayerCollected;
 
+        // Camera
         Camera cam = Camera.main;
         if (cam != null)
         {
-            CameraSystem = cam.gameObject.GetComponent<CameraFollow>();
-            if (CameraSystem == null) CameraSystem = cam.gameObject.AddComponent<CameraFollow>();
+            CameraSystem = cam.GetComponent<CameraFollow>() ?? cam.gameObject.AddComponent<CameraFollow>();
             CameraSystem.SetTarget(Player.transform);
-            cam.backgroundColor = RenderSettings.fogColor;
+
+            // Sky colour matches fog
+            cam.backgroundColor = new Color(0.45f, 0.68f, 0.88f);
             cam.clearFlags      = CameraClearFlags.SolidColor;
         }
     }
 
-    // ─── Game State ────────────────────────────────────────────────────────────
-
+    // ── State machine ─────────────────────────────────────────────────────────
     public void ShowMenu()
     {
         CurrentState = GameState.Menu;
         Time.timeScale = 1f;
-        ResetRuntimeState();
+        ResetState();
         Spawner?.ResetTrack();
         Player?.StopRun();
     }
@@ -114,12 +113,11 @@ public class JungleDashGame : MonoBehaviour
     {
         CurrentState = GameState.Playing;
         Time.timeScale = 1f;
-        ResetRuntimeState();
+        ResetState();
         PowerUpManager.Instance?.ResetAll();
         Spawner?.ResetTrack();
         Player?.StartRun();
-        if (CameraSystem != null && Player != null)
-            CameraSystem.SetTarget(Player.transform);
+        if (CameraSystem != null && Player != null) CameraSystem.SetTarget(Player.transform);
     }
 
     public void PauseGame()
@@ -136,19 +134,18 @@ public class JungleDashGame : MonoBehaviour
         Time.timeScale = 1f;
     }
 
-    private void ResetRuntimeState()
+    private void ResetState()
     {
-        CurrentSpeed  = BaseSpeed;
-        Distance      = 0f;
-        Score         = 0;
-        Coins         = 0;
-        distAcc       = 0f;
-        pickupPts     = 0;
+        CurrentSpeed   = BaseSpeed;
+        Distance       = 0f;
+        Score          = 0;
+        Coins          = 0;
+        distAcc        = 0f;
+        pickupPts      = 0;
         IsNewHighScore = false;
     }
 
-    // ─── Update ────────────────────────────────────────────────────────────────
-
+    // ── Update ────────────────────────────────────────────────────────────────
     private void Update()
     {
         HandleKeys();
@@ -157,11 +154,10 @@ public class JungleDashGame : MonoBehaviour
         float dt = Time.deltaTime;
         CurrentSpeed = Mathf.Min(MaxSpeed, CurrentSpeed + Accel * dt);
 
-        float speed = CurrentSpeed;
-        if (PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.SpeedBoost))
-            speed *= 1.45f;
+        float spd = CurrentSpeed *
+            ((PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.SpeedBoost)) ? 1.45f : 1f);
 
-        float dd = speed * dt;
+        float dd = spd * dt;
         Distance += dd;
 
         if (Player != null)
@@ -170,8 +166,8 @@ public class JungleDashGame : MonoBehaviour
             Spawner?.UpdateSpawner(Player.transform.position.z);
         }
 
-        float scoreMult = (PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.DoubleScore)) ? 2f : 1f;
-        distAcc += dd * scoreMult;
+        float mult = (PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.DoubleScore)) ? 2f : 1f;
+        distAcc += dd * mult;
         Score    = Mathf.FloorToInt(distAcc) + pickupPts;
     }
 
@@ -179,30 +175,30 @@ public class JungleDashGame : MonoBehaviour
     {
         if (CurrentState == GameState.Playing)
         {
-            if (Input.GetKeyDown(KeyCode.LeftArrow)  || Input.GetKeyDown(KeyCode.A)) Player?.MoveLeft();
-            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D)) Player?.MoveRight();
-            if (Input.GetKeyDown(KeyCode.UpArrow)    || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W)) Player?.Jump();
-            if (Input.GetKeyDown(KeyCode.Escape)     || Input.GetKeyDown(KeyCode.P)) PauseGame();
+            if (Input.GetKeyDown(KeyCode.LeftArrow)  || Input.GetKeyDown(KeyCode.A))     Player?.MoveLeft();
+            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))     Player?.MoveRight();
+            if (Input.GetKeyDown(KeyCode.UpArrow)    || Input.GetKeyDown(KeyCode.Space)
+                                                     || Input.GetKeyDown(KeyCode.W))     Player?.Jump();
+            if (Input.GetKeyDown(KeyCode.Escape)     || Input.GetKeyDown(KeyCode.P))     PauseGame();
         }
         else if (CurrentState == GameState.Paused)
         {
             if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P)) ResumeGame();
         }
-        else if (CurrentState == GameState.Menu || CurrentState == GameState.GameOver)
+        else
         {
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space)) StartGame();
         }
     }
 
-    // ─── Event Handlers ────────────────────────────────────────────────────────
-
+    // ── Events ────────────────────────────────────────────────────────────────
     private void OnPlayerCollected(Collectible c)
     {
         float mult = (PowerUpManager.Instance != null && PowerUpManager.Instance.IsActive(PowerUpType.DoubleScore)) ? 2f : 1f;
         switch (c.Type)
         {
             case CollectibleType.Coin:
-                Coins++;  TotalCoins++;
+                Coins++; TotalCoins++;
                 pickupPts += Mathf.RoundToInt(10 * mult);
                 SoundManager.Instance?.PlayCoin();
                 break;

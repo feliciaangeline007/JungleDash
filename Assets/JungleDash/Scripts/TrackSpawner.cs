@@ -6,45 +6,98 @@ namespace JungleDash
     public class TrackSpawner : MonoBehaviour
     {
         private const float SegLen = 24f;
-        private const int MaxSegs = 8;
+        private const int MaxSegs = 10;
 
         private float nextZ = -12f;
         private readonly List<GameObject> segs = new List<GameObject>();
 
-        private Material pathMat, grassMat, barkMat, leafMat, rockMat, coinMat, gemMat, puMat;
-        private Shader litShader;
+        // Materials
+        private Material pathMat, grassMat, barkMat, leafMat, darkLeafMat;
+        private Material rockMat, dirtMat, stoneMat;
+        private Material coinMat, gemMat, puMat;
+        private Material dividerMat, skyMat;
 
-        private void Awake()
+        private void Awake() => BuildMaterials();
+
+        // ── Shader helper ──────────────────────────────────────────────────────
+        // Tries every known URP shader name then falls back to Standard/Unlit so
+        // we NEVER get a pink material regardless of Unity 6 sub-version.
+        private static Shader SafeShader()
         {
-            litShader = Shader.Find("Universal Render Pipeline/Lit")
-                     ?? Shader.Find("Universal Render Pipeline/Simple Lit")
-                     ?? Shader.Find("Standard");
-            BuildMaterials();
+            string[] names = {
+                "Universal Render Pipeline/Lit",
+                "Universal Render Pipeline/Simple Lit",
+                "Universal Render Pipeline/Unlit",
+                "Unlit/Color",
+                "Standard",
+                "Diffuse"
+            };
+            foreach (var n in names)
+            {
+                var s = Shader.Find(n);
+                if (s != null) return s;
+            }
+            return Shader.Find("Hidden/InternalErrorShader"); // absolute last resort
         }
 
-        private Material Mat(Color c)
+        private static Material M(Color baseColor, float metallic = 0f, float smooth = 0.3f)
         {
-            var m = new Material(litShader);
-            m.color = c;
-            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
-            return m;
+            var shader = SafeShader();
+            var mat = new Material(shader);
+
+            // URP property names
+            if (mat.HasProperty("_BaseColor"))      mat.SetColor("_BaseColor", baseColor);
+            if (mat.HasProperty("_Color"))          mat.SetColor("_Color", baseColor);
+            if (mat.HasProperty("_Metallic"))       mat.SetFloat("_Metallic", metallic);
+            if (mat.HasProperty("_Smoothness"))     mat.SetFloat("_Smoothness", smooth);
+            if (mat.HasProperty("_Glossiness"))     mat.SetFloat("_Glossiness", smooth);
+            return mat;
+        }
+
+        private static Material MEmissive(Color baseColor, Color emitColor, float emitIntensity = 1.5f)
+        {
+            var mat = M(baseColor, 0.6f, 0.8f);
+            if (mat.HasProperty("_EmissionColor"))
+            {
+                mat.EnableKeyword("_EMISSION");
+                mat.SetColor("_EmissionColor", emitColor * emitIntensity);
+            }
+            return mat;
         }
 
         private void BuildMaterials()
         {
-            pathMat = Mat(new Color(0.62f, 0.52f, 0.36f));
-            var tex = Resources.Load<Texture2D>("MudRocky");
-            if (tex != null) { pathMat.mainTexture = tex; pathMat.mainTextureScale = new Vector2(2f, 6f); }
+            // Ground
+            pathMat     = M(new Color(0.55f, 0.44f, 0.28f), 0f, 0.2f);   // sandy brown path
+            var mudTex  = Resources.Load<Texture2D>("MudRocky");
+            if (mudTex != null)
+            {
+                if (pathMat.HasProperty("_BaseMap"))      pathMat.SetTexture("_BaseMap", mudTex);
+                else                                      pathMat.mainTexture = mudTex;
+                pathMat.mainTextureScale = new Vector2(2f, 8f);
+            }
+            grassMat    = M(new Color(0.20f, 0.48f, 0.15f), 0f, 0.15f);  // vibrant jungle green
+            dirtMat     = M(new Color(0.32f, 0.22f, 0.12f), 0f, 0.1f);
 
-            grassMat = Mat(new Color(0.24f, 0.46f, 0.18f));
-            barkMat  = Mat(new Color(0.38f, 0.26f, 0.15f));
-            leafMat  = Mat(new Color(0.18f, 0.58f, 0.22f));
-            rockMat  = Mat(new Color(0.42f, 0.44f, 0.40f));
-            coinMat  = Mat(new Color(1f, 0.82f, 0.1f));
-            gemMat   = Mat(new Color(0.85f, 0.25f, 1f));
-            puMat    = Mat(new Color(0.1f, 0.85f, 0.95f));
+            // Trees
+            barkMat     = M(new Color(0.30f, 0.18f, 0.08f), 0f, 0.1f);
+            leafMat     = M(new Color(0.15f, 0.55f, 0.18f), 0f, 0.15f);
+            darkLeafMat = M(new Color(0.10f, 0.38f, 0.12f), 0f, 0.12f);
+
+            // Obstacles
+            rockMat     = M(new Color(0.40f, 0.42f, 0.38f), 0.05f, 0.2f);
+            stoneMat    = M(new Color(0.50f, 0.47f, 0.42f), 0.05f, 0.25f);
+
+            // Collectibles – emissive so they glow even without perfect lighting
+            coinMat     = MEmissive(new Color(1f, 0.80f, 0.05f), new Color(1f, 0.65f, 0f), 1.8f);
+            gemMat      = MEmissive(new Color(0.70f, 0.10f, 1.00f), new Color(0.5f, 0f, 1f), 2.0f);
+            puMat       = MEmissive(new Color(0.05f, 0.90f, 1.00f), new Color(0f, 0.8f, 1f), 2.2f);
+
+            // Lane divider
+            dividerMat  = M(new Color(0.90f, 0.85f, 0.60f), 0f, 0.05f);
         }
 
+        // ── Public API ────────────────────────────────────────────────────────
         public void ResetTrack()
         {
             foreach (var s in segs) if (s) Destroy(s);
@@ -56,106 +109,252 @@ namespace JungleDash
         public void UpdateSpawner(float playerZ)
         {
             while (nextZ < playerZ + MaxSegs * SegLen) SpawnSeg(true);
-            while (segs.Count > 0 && segs[0] != null && segs[0].transform.position.z + SegLen < playerZ - 18f)
+            while (segs.Count > 0 && segs[0] != null
+                   && segs[0].transform.position.z + SegLen < playerZ - 20f)
             {
                 Destroy(segs[0]);
                 segs.RemoveAt(0);
             }
         }
 
+        // ── Segment ───────────────────────────────────────────────────────────
         private void SpawnSeg(bool withObs)
         {
-            var seg = new GameObject("Seg_" + nextZ);
+            var seg = new GameObject("Seg_" + Mathf.RoundToInt(nextZ));
             seg.transform.SetParent(transform, true);
             seg.transform.position = new Vector3(0f, 0f, nextZ);
 
-            // Path floor
-            var path = Prim(PrimitiveType.Cube, seg.transform, new Vector3(0f, -0.1f, SegLen * 0.5f),
-                new Vector3(8.5f, 0.2f, SegLen), pathMat, false);
-            path.tag = "Ground";
-
-            // Wide grass flanks
-            var grass = Prim(PrimitiveType.Cube, seg.transform, new Vector3(0f, -0.25f, SegLen * 0.5f),
-                new Vector3(70f, 0.25f, SegLen), grassMat, false);
-            grass.tag = "Ground";
-
-            // Lane divider dashes
-            for (int i = 0; i < 3; i++)
-            {
-                float mz = 4f + i * 8f;
-                DividerDash(seg.transform, -1.3f, mz);
-                DividerDash(seg.transform, 1.3f, mz);
-            }
-
-            // Flanking jungle trees & bushes
-            int trees = Random.Range(4, 7);
-            for (int i = 0; i < trees; i++)
-            {
-                float side = (i % 2 == 0) ? -1f : 1f;
-                float x = side * Random.Range(6.2f, 15f);
-                float z = Random.Range(2f, SegLen - 2f);
-                if (Random.value < 0.55f) PalmTree(seg.transform, new Vector3(x, 0f, z));
-                else BroadTree(seg.transform, new Vector3(x, 0f, z));
-            }
-            for (int b = 0; b < 3; b++)
-            {
-                float side = (b % 2 == 0) ? -1f : 1f;
-                Bush(seg.transform, new Vector3(side * Random.Range(4.8f, 6.2f), 0f, Random.Range(3f, SegLen - 3f)));
-            }
+            BuildGround(seg.transform);
+            BuildLaneDividers(seg.transform);
+            BuildFoliage(seg.transform);
 
             if (withObs) SpawnObstaclesPickups(seg.transform);
-            else         SpawnCoins(seg.transform, 1, 8f, 4);
+            else         SpawnCoins(seg.transform, 1, 8f, 5);
 
             segs.Add(seg);
             nextZ += SegLen;
         }
 
-        private void DividerDash(Transform p, float x, float z)
+        private void BuildGround(Transform seg)
         {
-            var d = Prim(PrimitiveType.Cube, p, new Vector3(x, 0.01f, z),
-                new Vector3(0.08f, 0.02f, 2.6f), leafMat, false);
-        }
+            // Main dirt path (narrower, defined edges)
+            var path = Prim(PrimitiveType.Cube, seg,
+                new Vector3(0f, -0.05f, SegLen * 0.5f),
+                new Vector3(9f, 0.15f, SegLen), pathMat, false);
+            path.tag = "Ground";
 
-        private void PalmTree(Transform p, Vector3 pos)
-        {
-            var t = new GameObject("Palm"); t.transform.SetParent(p, false); t.transform.localPosition = pos;
-            float h = Random.Range(5.5f, 7.5f);
-            Prim(PrimitiveType.Cylinder, t.transform, new Vector3(0f, h * 0.5f, 0f), new Vector3(0.42f, h * 0.5f, 0.42f), barkMat);
-            for (int f = 0; f < 7; f++)
+            // Raised edges / curbs on path sides
+            for (int s = -1; s <= 1; s += 2)
             {
-                var fr = Prim(PrimitiveType.Cube, t.transform, new Vector3(0f, h, 0f), new Vector3(0.35f, 0.08f, 2.6f), leafMat);
-                fr.transform.localRotation = Quaternion.Euler(22f, f * (360f / 7), 0f);
+                var curb = Prim(PrimitiveType.Cube, seg,
+                    new Vector3(s * 4.65f, 0.04f, SegLen * 0.5f),
+                    new Vector3(0.3f, 0.18f, SegLen), stoneMat, false);
+                curb.tag = "Ground";
+            }
+
+            // Wide flanking grass floor
+            var grass = Prim(PrimitiveType.Cube, seg,
+                new Vector3(0f, -0.2f, SegLen * 0.5f),
+                new Vector3(80f, 0.25f, SegLen), grassMat, false);
+            grass.tag = "Ground";
+
+            // Dirt strip transitions between path and grass
+            for (int s = -1; s <= 1; s += 2)
+            {
+                Prim(PrimitiveType.Cube, seg,
+                    new Vector3(s * 6.5f, -0.12f, SegLen * 0.5f),
+                    new Vector3(3f, 0.15f, SegLen), dirtMat, false);
             }
         }
 
-        private void BroadTree(Transform p, Vector3 pos)
+        private void BuildLaneDividers(Transform seg)
         {
-            var t = new GameObject("BroadTree"); t.transform.SetParent(p, false); t.transform.localPosition = pos;
-            float h = Random.Range(4.5f, 6.2f);
-            Prim(PrimitiveType.Cylinder, t.transform, new Vector3(0f, h * 0.5f, 0f), new Vector3(0.6f, h * 0.5f, 0.6f), barkMat);
-            Prim(PrimitiveType.Sphere, t.transform, new Vector3(0f, h * 0.9f, 0f), new Vector3(3.2f, 2.8f, 3.2f), leafMat);
+            // Dashed lines at x = ±2.6
+            int dashCount = 6;
+            for (int d = 0; d < dashCount; d++)
+            {
+                float z = 2f + d * (SegLen / dashCount);
+                for (int s = -1; s <= 1; s += 2)
+                {
+                    Prim(PrimitiveType.Cube, seg,
+                        new Vector3(s * 2.6f, 0.02f, z),
+                        new Vector3(0.12f, 0.04f, 1.8f), dividerMat, false);
+                }
+            }
         }
 
-        private void Bush(Transform p, Vector3 pos)
+        private void BuildFoliage(Transform seg)
         {
-            Prim(PrimitiveType.Sphere, p, pos + Vector3.up * 0.35f, new Vector3(1.4f, 0.9f, 1.4f), leafMat);
+            // Tall trees on both sides
+            int treeCount = Random.Range(5, 9);
+            for (int i = 0; i < treeCount; i++)
+            {
+                float side = (i % 2 == 0) ? -1f : 1f;
+                float x = side * Random.Range(7f, 18f);
+                float z = Random.Range(2f, SegLen - 2f);
+                float roll = Random.value;
+                if (roll < 0.45f)      PalmTree(seg, new Vector3(x, 0f, z));
+                else if (roll < 0.75f) BroadTree(seg, new Vector3(x, 0f, z));
+                else                   BambooCluster(seg, new Vector3(x, 0f, z));
+            }
+
+            // Dense bushes close to the path
+            int bushCount = Random.Range(3, 6);
+            for (int b = 0; b < bushCount; b++)
+            {
+                float side = (b % 2 == 0) ? -1f : 1f;
+                float x = side * Random.Range(5.2f, 7.5f);
+                float z = Random.Range(3f, SegLen - 3f);
+                Bush(seg, new Vector3(x, 0f, z));
+            }
+
+            // Decorative mossy rocks on sides
+            if (Random.value < 0.6f)
+            {
+                float side = Random.value < 0.5f ? -1f : 1f;
+                float x = side * Random.Range(5.5f, 8f);
+                float z = Random.Range(4f, SegLen - 4f);
+                DecoRock(seg, new Vector3(x, 0f, z));
+            }
         }
 
+        // ── Trees ─────────────────────────────────────────────────────────────
+        private void PalmTree(Transform seg, Vector3 pos)
+        {
+            var t = new GameObject("Palm");
+            t.transform.SetParent(seg, false);
+            t.transform.localPosition = pos;
+            float scale = Random.Range(0.9f, 1.4f);
+            float h = Random.Range(6f, 9f) * scale;
+
+            // Slightly curved trunk (stack of cylinders)
+            int segments = 4;
+            for (int i = 0; i < segments; i++)
+            {
+                float y0 = i * (h / segments);
+                float lean = i * 0.08f * scale;
+                var seg2 = Prim(PrimitiveType.Cylinder, t.transform,
+                    new Vector3(lean, y0 + h / segments * 0.5f, 0f),
+                    new Vector3(0.38f * scale, h / segments * 0.5f, 0.38f * scale), barkMat);
+            }
+
+            // Crown of fronds
+            int frondCount = 8;
+            for (int f = 0; f < frondCount; f++)
+            {
+                float angle = f * (360f / frondCount);
+                float tilt = Random.Range(18f, 30f);
+                var frond = Prim(PrimitiveType.Cube, t.transform,
+                    new Vector3(0f, h, 0f),
+                    new Vector3(0.28f * scale, 0.07f, 2.8f * scale), leafMat);
+                frond.transform.localRotation = Quaternion.Euler(tilt, angle, 0f);
+            }
+
+            // Small sphere at crown center
+            Prim(PrimitiveType.Sphere, t.transform,
+                new Vector3(0f, h + 0.15f, 0f),
+                Vector3.one * 0.5f * scale, darkLeafMat);
+        }
+
+        private void BroadTree(Transform seg, Vector3 pos)
+        {
+            var t = new GameObject("BroadTree");
+            t.transform.SetParent(seg, false);
+            t.transform.localPosition = pos;
+            float scale = Random.Range(0.85f, 1.3f);
+            float h = Random.Range(5f, 8f) * scale;
+
+            Prim(PrimitiveType.Cylinder, t.transform,
+                new Vector3(0f, h * 0.5f, 0f),
+                new Vector3(0.55f * scale, h * 0.5f, 0.55f * scale), barkMat);
+
+            // Layered canopy (3 spheres at different heights)
+            float[] canopyY   = { h * 0.72f, h * 0.90f, h * 1.05f };
+            float[] canopyR   = { 3.0f, 2.4f, 1.6f };
+            bool[] useDark    = { true, false, true };
+            for (int i = 0; i < 3; i++)
+            {
+                Prim(PrimitiveType.Sphere, t.transform,
+                    new Vector3(Random.Range(-0.3f, 0.3f) * scale, canopyY[i], Random.Range(-0.3f, 0.3f) * scale),
+                    new Vector3(canopyR[i] * scale, canopyR[i] * 0.85f * scale, canopyR[i] * scale),
+                    useDark[i] ? darkLeafMat : leafMat);
+            }
+        }
+
+        private void BambooCluster(Transform seg, Vector3 pos)
+        {
+            int count = Random.Range(3, 6);
+            for (int i = 0; i < count; i++)
+            {
+                var t = new GameObject("Bamboo");
+                t.transform.SetParent(seg, false);
+                float ox = Random.Range(-0.6f, 0.6f);
+                float oz = Random.Range(-0.6f, 0.6f);
+                t.transform.localPosition = pos + new Vector3(ox, 0f, oz);
+                float h = Random.Range(5f, 8f);
+
+                // Bamboo segments
+                int nodeCount = Mathf.RoundToInt(h / 1.2f);
+                for (int n = 0; n < nodeCount; n++)
+                {
+                    float y = n * 1.2f + 0.6f;
+                    Prim(PrimitiveType.Cylinder, t.transform,
+                        new Vector3(0f, y, 0f),
+                        new Vector3(0.15f, 0.62f, 0.15f),
+                        n % 2 == 0 ? leafMat : darkLeafMat);
+                }
+                // Small leaves at top
+                Prim(PrimitiveType.Sphere, t.transform,
+                    new Vector3(0f, h + 0.4f, 0f),
+                    new Vector3(0.8f, 0.5f, 0.8f), leafMat);
+            }
+        }
+
+        private void Bush(Transform seg, Vector3 pos)
+        {
+            // Multi-sphere bush for fullness
+            int spheres = Random.Range(2, 4);
+            for (int i = 0; i < spheres; i++)
+            {
+                float ox = Random.Range(-0.5f, 0.5f);
+                float oy = Random.Range(0.25f, 0.55f);
+                float s  = Random.Range(0.8f, 1.4f);
+                Prim(PrimitiveType.Sphere, seg,
+                    pos + new Vector3(ox, oy, Random.Range(-0.4f, 0.4f)),
+                    new Vector3(s * 1.3f, s * 0.85f, s * 1.3f),
+                    Random.value < 0.5f ? leafMat : darkLeafMat, false);
+            }
+        }
+
+        private void DecoRock(Transform seg, Vector3 pos)
+        {
+            int count = Random.Range(1, 4);
+            for (int i = 0; i < count; i++)
+            {
+                float s = Random.Range(0.4f, 1.1f);
+                var r = Prim(PrimitiveType.Sphere, seg,
+                    pos + new Vector3(Random.Range(-0.6f, 0.6f), s * 0.4f, Random.Range(-0.5f, 0.5f)),
+                    new Vector3(s * 1.3f, s * 0.8f, s * 1.1f), rockMat, false);
+                r.transform.localRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+            }
+        }
+
+        // ── Obstacle / pickup spawning ─────────────────────────────────────────
         private void SpawnObstaclesPickups(Transform seg)
         {
-            int pattern  = Random.Range(0, 3);
-            float obsZ   = Random.Range(8f, 14f);
-            int safeLane = Random.Range(0, 3);
+            int pattern   = Random.Range(0, 3);
+            float obsZ    = Random.Range(8f, 16f);
+            int safeLane  = Random.Range(0, 3);
 
             if (pattern == 0)
             {
                 SpawnObstacle(seg, (safeLane + 1) % 3, obsZ);
-                SpawnCoins(seg, safeLane, obsZ - 4f, 4);
+                SpawnCoins(seg, safeLane, obsZ - 5f, 5);
             }
             else if (pattern == 1)
             {
                 for (int l = 0; l < 3; l++) if (l != safeLane) SpawnObstacle(seg, l, obsZ);
-                SpawnCoins(seg, safeLane, obsZ - 3f, 3);
+                SpawnCoins(seg, safeLane, obsZ - 4f, 4);
             }
             else
             {
@@ -163,92 +362,135 @@ namespace JungleDash
                 SpawnArcCoins(seg, safeLane, obsZ);
             }
 
-            if (Random.value < 0.28f)
+            if (Random.value < 0.32f)
             {
-                float pz = obsZ + 7f;
-                int pl = Random.Range(0, 3);
+                float pz = obsZ + 8f;
+                int   pl = Random.Range(0, 3);
                 if (Random.value < 0.45f) SpawnPowerUp(seg, pl, pz);
-                else SpawnGem(seg, pl, pz);
+                else                      SpawnGem(seg, pl, pz);
             }
         }
 
-        private void SpawnObstacle(Transform p, int lane, float z)
+        private void SpawnObstacle(Transform seg, int lane, float z)
         {
             float x = PlayerRunner.LaneX[lane];
-            int t = Random.Range(0, 3);
-            GameObject go;
-            if (t == 0)
+            int   t = Random.Range(0, 3);
+
+            if (t == 0) // Boulder
             {
-                go = Prim(PrimitiveType.Sphere, p, new Vector3(x, 0.85f, z), new Vector3(1.8f, 1.7f, 1.8f), rockMat);
+                var go = Prim(PrimitiveType.Sphere, seg,
+                    new Vector3(x, 0.9f, z), new Vector3(1.9f, 1.8f, 1.9f), rockMat);
                 go.GetComponent<Collider>().isTrigger = true;
-                go.AddComponent<Obstacle>().Initialize(ObstacleType.Rock, 1.7f);
+                go.AddComponent<Obstacle>().Initialize(ObstacleType.Rock, 1.8f);
             }
-            else if (t == 1)
+            else if (t == 1) // Stone pillar
             {
-                go = Prim(PrimitiveType.Cylinder, p, new Vector3(x, 1.5f, z), new Vector3(1.1f, 1.5f, 1.1f), rockMat);
+                var go = Prim(PrimitiveType.Cylinder, seg,
+                    new Vector3(x, 1.6f, z), new Vector3(1.1f, 1.6f, 1.1f), stoneMat);
                 go.GetComponent<Collider>().isTrigger = true;
-                go.AddComponent<Obstacle>().Initialize(ObstacleType.AncientPillar, 3f);
+                go.AddComponent<Obstacle>().Initialize(ObstacleType.AncientPillar, 3.2f);
+
+                // Pillar cap
+                Prim(PrimitiveType.Cube, seg,
+                    new Vector3(x, 3.3f, z), new Vector3(1.5f, 0.25f, 1.5f), stoneMat, false);
             }
-            else
+            else // Tree stump
             {
-                go = Prim(PrimitiveType.Cylinder, p, new Vector3(x, 0.4f, z), new Vector3(1.2f, 0.4f, 1.2f), barkMat);
+                var go = Prim(PrimitiveType.Cylinder, seg,
+                    new Vector3(x, 0.45f, z), new Vector3(1.3f, 0.45f, 1.3f), barkMat);
                 go.GetComponent<Collider>().isTrigger = true;
-                go.AddComponent<Obstacle>().Initialize(ObstacleType.LowBarrier, 0.8f);
+                go.AddComponent<Obstacle>().Initialize(ObstacleType.LowBarrier, 0.9f);
+
+                // Ring on top of stump
+                Prim(PrimitiveType.Cylinder, seg,
+                    new Vector3(x, 0.92f, z), new Vector3(1.4f, 0.06f, 1.4f), rockMat, false);
             }
         }
 
-        private void SpawnLog(Transform p, int lane, float z)
+        private void SpawnLog(Transform seg, int lane, float z)
         {
             float x = PlayerRunner.LaneX[lane];
-            var go = Prim(PrimitiveType.Cylinder, p, new Vector3(x, 0.35f, z), new Vector3(0.55f, 1.35f, 0.55f), barkMat);
+            var go = Prim(PrimitiveType.Cylinder, seg,
+                new Vector3(x, 0.38f, z), new Vector3(0.6f, 1.4f, 0.6f), barkMat);
             go.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
             go.GetComponent<Collider>().isTrigger = true;
-            go.AddComponent<Obstacle>().Initialize(ObstacleType.FallenLog, 0.7f);
+            go.AddComponent<Obstacle>().Initialize(ObstacleType.FallenLog, 0.76f);
+
+            // Log end caps
+            for (int s = -1; s <= 1; s += 2)
+            {
+                Prim(PrimitiveType.Cylinder, seg,
+                    new Vector3(x + s * 1.5f, 0.38f, z),
+                    new Vector3(0.64f, 0.08f, 0.64f), rockMat, false);
+            }
         }
 
-        private void SpawnCoins(Transform p, int lane, float startZ, int count)
+        private void SpawnCoins(Transform seg, int lane, float startZ, int count)
         {
             float x = PlayerRunner.LaneX[lane];
-            for (int i = 0; i < count; i++) AddCoin(p, new Vector3(x, 0.75f, startZ + i * 2.2f));
+            for (int i = 0; i < count; i++)
+                AddCoin(seg, new Vector3(x, 0.85f, startZ + i * 2.0f));
         }
 
-        private void SpawnArcCoins(Transform p, int lane, float cz)
+        private void SpawnArcCoins(Transform seg, int lane, float cz)
         {
             float x = PlayerRunner.LaneX[lane];
-            float[] heights = { 0.75f, 1.2f, 1.8f, 2.2f, 1.8f, 1.2f, 0.75f };
-            for (int i = 0; i < heights.Length; i++)
-                AddCoin(p, new Vector3(x, heights[i], cz - 3f + i * 1.0f));
+            float[] hy = { 0.85f, 1.2f, 1.7f, 2.1f, 2.3f, 2.1f, 1.7f, 1.2f, 0.85f };
+            for (int i = 0; i < hy.Length; i++)
+                AddCoin(seg, new Vector3(x, hy[i], cz - 4f + i * 1.0f));
         }
 
-        private void SpawnGem(Transform p, int lane, float z)
+        private void SpawnGem(Transform seg, int lane, float z)
         {
             float x = PlayerRunner.LaneX[lane];
-            var go = Prim(PrimitiveType.Sphere, p, new Vector3(x, 0.75f, z), Vector3.one * 0.55f, gemMat);
+            // Diamond shape: sphere + rotated cube
+            var go = Prim(PrimitiveType.Sphere, seg,
+                new Vector3(x, 0.85f, z), Vector3.one * 0.58f, gemMat);
             go.GetComponent<Collider>().isTrigger = true;
             var c = go.AddComponent<Collectible>();
             c.Type = CollectibleType.Gem;
+
+            // Sparkle ring
+            var ring = Prim(PrimitiveType.Cylinder, seg,
+                new Vector3(x, 0.85f, z), new Vector3(1.1f, 0.06f, 1.1f), gemMat, false);
         }
 
-        private void SpawnPowerUp(Transform p, int lane, float z)
+        private void SpawnPowerUp(Transform seg, int lane, float z)
         {
             float x = PlayerRunner.LaneX[lane];
-            var go = Prim(PrimitiveType.Cube, p, new Vector3(x, 0.75f, z), Vector3.one * 0.7f, puMat);
+            // Star-like shape: cube rotated 45°
+            var go = Prim(PrimitiveType.Cube, seg,
+                new Vector3(x, 0.85f, z), Vector3.one * 0.72f, puMat);
+            go.transform.localRotation = Quaternion.Euler(35f, 45f, 0f);
             go.GetComponent<Collider>().isTrigger = true;
             var c = go.AddComponent<Collectible>();
             c.Type = CollectibleType.PowerUp;
-            PowerUpType[] types = { PowerUpType.Magnet, PowerUpType.Shield, PowerUpType.SpeedBoost, PowerUpType.DoubleScore, PowerUpType.Fly };
+
+            PowerUpType[] types = {
+                PowerUpType.Magnet, PowerUpType.Shield,
+                PowerUpType.SpeedBoost, PowerUpType.DoubleScore, PowerUpType.Fly
+            };
             c.PowerUpVariant = types[Random.Range(0, types.Length)];
+
+            // Halo ring
+            Prim(PrimitiveType.Cylinder, seg,
+                new Vector3(x, 0.85f, z), new Vector3(1.3f, 0.07f, 1.3f), puMat, false);
         }
 
-        private void AddCoin(Transform p, Vector3 localPos)
+        private void AddCoin(Transform seg, Vector3 localPos)
         {
-            var go = Prim(PrimitiveType.Cylinder, p, localPos, new Vector3(0.45f, 0.08f, 0.45f), coinMat);
+            // Coin = flat cylinder (like a real coin)
+            var go = Prim(PrimitiveType.Cylinder, seg,
+                localPos, new Vector3(0.48f, 0.07f, 0.48f), coinMat);
             go.GetComponent<Collider>().isTrigger = true;
             go.AddComponent<Collectible>().Type = CollectibleType.Coin;
         }
 
-        // Helper: create primitive, optionally remove collider
-        private GameObject Prim(PrimitiveType type, Transform parent, Vector3 localPos, Vector3 scale, Material mat, bool keepCollider = true)
+        // ── Primitive helper ──────────────────────────────────────────────────
+        private static GameObject Prim(
+            PrimitiveType type, Transform parent,
+            Vector3 localPos, Vector3 scale, Material mat,
+            bool keepCollider = true)
         {
             var go = GameObject.CreatePrimitive(type);
             go.transform.SetParent(parent, false);
