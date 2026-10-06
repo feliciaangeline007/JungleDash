@@ -6,7 +6,7 @@ Panduan langkah demi langkah untuk mengintegrasikan Unity Standard Assets ke dal
 
 1. Buka Unity Editor dengan project Jungle Dash
 2. Pilih menu `Assets → Import Package → Custom Package...`
-3. Browse ke file: `.conversation/attached_assets/Standard_Assets_for_Unity_20184_1791255762597.unitypackage`
+3. Browse ke file: `Assets/ImportPackages/StandardAssets.unitypackage` (181 MB)
 4. Pada dialog import, centang semua item:
    - ✅ Standard Assets/Characters
    - ✅ Standard Assets/CrossPlatformInput

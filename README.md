@@ -95,9 +95,9 @@ Project ini menggunakan **Unity Standard Assets** untuk:
 - ✅ Mobile-optimized shaders
 
 ### Import Standard Assets:
-1. **File tersedia**: `.conversation/attached_assets/Standard_Assets_for_Unity_20184_1791255762597.unitypackage`
+1. **File tersedia**: `Assets/ImportPackages/StandardAssets.unitypackage` (181 MB)
 2. Di Unity: `Assets → Import Package → Custom Package`
-3. Browse ke file unitypackage
+3. Browse ke file `Assets/ImportPackages/StandardAssets.unitypackage`
 4. Import semua assets
 
 ## Build

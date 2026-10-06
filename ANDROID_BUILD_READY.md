@@ -22,8 +22,9 @@ Project **Jungle Dash** sudah dikonfigurasi lengkap untuk Android dengan Unity 6
 - **Quality Settings**: 6 preset (Very Low sampai Ultra) dengan URP
 
 ### 3. ✅ Standard Assets Package
-- **Location**: `.conversation/attached_assets/Standard_Assets_for_Unity_20184_1791255762597.unitypackage`
-- **Size**: 134 bytes (symbolic link ke package penuh)
+- **Location**: `Assets/ImportPackages/StandardAssets.unitypackage`
+- **Size**: 181 MB (complete package)
+- **Source**: GitHub marticliment/UnityStandardAssets
 - **Includes**:
   - Third Person Character Controller
   - CrossPlatformInput (swipe + virtual buttons)
@@ -76,7 +77,7 @@ Project **Jungle Dash** sudah dikonfigurasi lengkap untuk Android dengan Unity 6
 ```bash
 # Di Unity Editor:
 1. Assets → Import Package → Custom Package...
-2. Browse: .conversation/attached_assets/Standard_Assets_for_Unity_20184_1791255762597.unitypackage
+2. Browse: Assets/ImportPackages/StandardAssets.unitypackage (181 MB)
 3. Centang semua items
 4. Click "Import"
 5. Tunggu proses import selesai (beberapa menit)
@@ -223,8 +224,9 @@ Jungle Dash/
 │   ├── AndroidLogcatSettings.asset       # Android logging
 │   ├── AndroidResolverSettings.xml       # Android build config
 │   └── EditorUserBuildSettings.asset     # Android target
-├── .conversation/attached_assets/
-│   └── Standard_Assets_for_Unity_20184_1791255762597.unitypackage
+├── Assets/ImportPackages/
+│   ├── StandardAssets.unitypackage      # 181 MB - Ready to import
+│   └── README.md                         # Import instructions
 ├── README.md                             # Main documentation
 ├── ANDROID_SETUP.md                      # Android guide
 ├── STANDARD_ASSETS_INTEGRATION.md        # Integration tutorial

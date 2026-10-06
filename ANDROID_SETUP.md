@@ -58,13 +58,15 @@ Project ini menggunakan **Unity Standard Assets** yang sudah diimport. Standard 
 
 File Standard Assets sudah tersedia di:
 ```
-.conversation/attached_assets/Standard_Assets_for_Unity_20184_1791255762597.unitypackage
+Assets/ImportPackages/StandardAssets.unitypackage
 ```
+**Size**: 181 MB  
+**Source**: GitHub marticliment/UnityStandardAssets
 
 ### Cara Import:
 1. Buka Unity Editor
 2. Pilih `Assets > Import Package > Custom Package...`
-3. Browse ke file `.conversation/attached_assets/Standard_Assets_for_Unity_20184_1791255762597.unitypackage`
+3. Browse ke file: `Assets/ImportPackages/StandardAssets.unitypackage`
 4. Klik `Open`
 5. Pada dialog import, pastikan semua item tercentang
 6. Klik `Import`
