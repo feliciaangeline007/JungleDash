@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<projectSettings>
+  <projectSetting name="AndroidAbis" value="armeabi-v7a,arm64-v8a" />
+  <projectSetting name="AndroidGradleBuildSystem" value="True" />
+  <projectSetting name="AndroidGradleTemplateEnabled" value="False" />
+  <projectSetting name="AutoResolveOnBuild" value="True" />
+  <projectSetting name="PatchMainTemplateGradle" value="True" />
+  <projectSetting name="UseJetifier" value="True" />
+  <projectSetting name="UseAndroidX" value="True" />
+</projectSettings>

@@ -1,0 +1,1 @@
+- [Preview graphics support](preview-graphics.md) — preview captures lack WebGL2; preserve the Canvas 2D fallback for basic playability.

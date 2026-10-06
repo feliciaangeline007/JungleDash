@@ -1,0 +1,90 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!162 &1
+EditorUserBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 34
+  m_BuildTargetPlatformPreference:
+    Standalone: 19
+  m_SelectedBuildTargetGroup: 7
+  androidBuildSubtarget: 0
+  androidBuildSystem: 1
+  androidBuildType: 0
+  androidCreateSymbols: 0
+  androidDeviceSocketAddress: 
+  androidETC2Fallback: 0
+  androidIsEmbedded: 0
+  androidLogcatTextFilter: 
+  androidPreferredInstallLocation: 1
+  androidSplitApplicationBinary: 0
+  androidUseLegacySdkTools: 0
+  buildAppBundle: 0
+  buildScriptsOnly: 0
+  compressFilesInPackage: 2
+  compressWithPsArc: 0
+  connectProfiler: 0
+  copyPDBFiles: 0
+  explicitArrayBoundsChecks: 0
+  explicitDivideByZeroChecks: 0
+  explicitNullChecks: 0
+  exportAsGoogleAndroidProject: 0
+  gcIncremental: 0
+  installInBuildFolder: 0
+  needSubmissionMaterials: 0
+  overrideMaxTextureSize: 0
+  overrideTextureCompression: 0
+  ps4BuildSubtarget: 0
+  ps4HardwareTarget: 0
+  ps5BuildSubtarget: 0
+  ps5HardwareTarget: 0
+  selectedBinaryOutputPath: 
+  selectedStandaloneTarget: 19
+  selectedXboxBuildSubtarget: 0
+  streamingInstallLaunchRange: 0
+  switchCreateRomFile: 0
+  switchEnableDebugPad: 0
+  switchEnableRomCompression: 0
+  switchIsNspRomCompressionEnabled: 0
+  switchNMETAOverride: 
+  switchNspBuildSubtarget: 0
+  switchNVNDrawValidation: 0
+  switchNVNGraphicDebugger: 0
+  switchNVNMaxTexturePoolRatio: 50
+  switchNVNMaxThreadActivity: -1
+  switchNVNOtherPoolRatio: 25
+  switchNVNShaderPoolsGranularity: 33554432
+  switchNVNTexturePoolRatio: 25
+  switchPlayerConnectionEnabled: 1
+  switchRomCompressionConfigPath: 
+  switchRomCompressionLevel: 224
+  switchUseGpuNvnValidationLibrary: 0
+  usbDeviceGroup: 
+  waitForManagedDebugger: 0
+  webGLCompressionFormat: 1
+  webGLCompressionLevel: 2
+  webGLDebugSymbols: 0
+  webGLExceptionSupport: 1
+  webGLLinkerTarget: 1
+  webGLNameFilesAsHashes: 0
+  webGLOptimizationLevel: 2
+  webGLSubTarget: 1
+  webGLSymbolDefinitions: []
+  webGLTemplate: APPLICATION:Default
+  webGLThreadsSupport: 0
+  webGLWasmArithmeticExceptions: 0
+  windowsDevicePortalAddress: 
+  windowsDevicePortalPassword: 
+  windowsDevicePortalUsername: 
+  wsaBuildAndRunDeployTarget: 0
+  wsaMinUWPSDK: 10.0.17763.0
+  wsaSubtarget: 0
+  wsaUWPBuildType: 0
+  wsaUWPSDK: 
+  xboxOneAdditionalDebugPorts: 
+  xboxOneDeployDrive: 
+  xboxOneDeployMethod: 0
+  xboxOnePackageEncryption: 0
+  xboxOnePackageUpdateGranularity: 2
+  xboxOneRebootIfDeployFailsAndRetry: 0
+  xboxOneRunMethod: 0
+  xboxOneUsername: 

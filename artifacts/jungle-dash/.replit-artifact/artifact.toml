@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Jungle Dash"
+description = "A playable 3D endless runner inspired by the Jungle Dash Unity project, with three-lane movement, jumps, obstacles, collectibles, power-ups, and keyboard or touch controls."
+version = "1.0.0"
+id = "artifacts/jungle-dash"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22078
+
+[services.development]
+run = "pnpm --filter @workspace/jungle-dash run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/jungle-dash", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/jungle-dash/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22078"
+BASE_PATH = "/"
