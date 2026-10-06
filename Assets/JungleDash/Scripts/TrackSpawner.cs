@@ -83,7 +83,8 @@ namespace JungleDash
         }
 
         // ── Public API ────────────────────────────────────────────────────────
-        public static float[] LaneX => new[] { -LaneW, 0f, LaneW };
+        // FIX: static readonly field instead of property returning new array each call
+        public static readonly float[] LaneX = { -LaneW, 0f, LaneW };
 
         public void ResetTrack()
         {

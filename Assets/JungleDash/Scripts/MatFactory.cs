@@ -1,5 +1,5 @@
-// MatFactory.cs – central shader/material factory for URP 17 (Unity 6000.6.3f1)
-// Resolves the correct shader at runtime so we NEVER get a pink material.
+// MatFactory.cs - centralized material/shader factory for URP 17 (Unity 6)
+// FIX: replaced ??= (C# 8) with explicit null checks (C# 7.3 compatible)
 using UnityEngine;
 
 namespace JungleDash
@@ -9,32 +9,50 @@ namespace JungleDash
         private static Shader _lit;
         private static Shader _unlit;
 
-        public static Shader Lit =>
-            _lit ??= Shader.Find("Universal Render Pipeline/Lit")
-                  ?? Shader.Find("Universal Render Pipeline/Simple Lit")
-                  ?? Shader.Find("Standard");
+        public static Shader Lit
+        {
+            get
+            {
+                if (_lit == null)
+                {
+                    _lit = Shader.Find("Universal Render Pipeline/Lit");
+                    if (_lit == null) _lit = Shader.Find("Universal Render Pipeline/Simple Lit");
+                    if (_lit == null) _lit = Shader.Find("Standard");
+                }
+                return _lit;
+            }
+        }
 
-        public static Shader Unlit =>
-            _unlit ??= Shader.Find("Universal Render Pipeline/Unlit")
-                    ?? Shader.Find("Unlit/Color")
-                    ?? Shader.Find("Standard");
+        public static Shader Unlit
+        {
+            get
+            {
+                if (_unlit == null)
+                {
+                    _unlit = Shader.Find("Universal Render Pipeline/Unlit");
+                    if (_unlit == null) _unlit = Shader.Find("Unlit/Color");
+                    if (_unlit == null) _unlit = Shader.Find("Standard");
+                }
+                return _unlit;
+            }
+        }
 
         // Opaque PBR material
         public static Material Opaque(Color c, float metal = 0f, float smooth = 0.3f)
         {
             var m = new Material(Lit);
-            Set(m, c, metal, smooth);
+            Apply(m, c, metal, smooth);
             return m;
         }
 
-        // Emissive (collectibles/effects) – uses Unlit for consistent brightness
+        // Emissive (collectibles/fx) - Unlit for consistent brightness regardless of lighting
         public static Material Glow(Color c, float brightness = 1.8f)
         {
-            var m = new Material(Unlit);
+            var sh = Unlit;
+            var m  = new Material(sh);
             Color bright = c * brightness;
             if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", bright);
             if (m.HasProperty("_Color"))     m.SetColor("_Color",     bright);
-            // Also enable emission for Lit fallback
             if (m.HasProperty("_EmissionColor"))
             {
                 m.EnableKeyword("_EMISSION");
@@ -43,7 +61,7 @@ namespace JungleDash
             return m;
         }
 
-        // Texture + tint material
+        // Texture + tint
         public static Material Textured(Texture2D tex, Color tint, Vector2 tiling)
         {
             var m = Opaque(tint);
@@ -61,7 +79,7 @@ namespace JungleDash
             return m;
         }
 
-        private static void Set(Material m, Color c, float metal, float smooth)
+        private static void Apply(Material m, Color c, float metal, float smooth)
         {
             if (m.HasProperty("_BaseColor"))  m.SetColor("_BaseColor",  c);
             if (m.HasProperty("_Color"))      m.SetColor("_Color",      c);

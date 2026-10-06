@@ -1,6 +1,7 @@
 // UIManager.cs – Temple Run-inspired HUD and menus
 // Dark stone UI panels, gold text, Indonesian localization.
 using UnityEngine;
+// JungleDashGame lives in the global namespace; no extra using needed.
 
 namespace JungleDash
 {

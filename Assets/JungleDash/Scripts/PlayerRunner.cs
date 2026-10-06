@@ -8,8 +8,9 @@ namespace JungleDash
 {
     public class PlayerRunner : MonoBehaviour
     {
-        // Lane positions synced with TrackSpawner
-        public static float[] LaneX => TrackSpawner.LaneX;
+        // Lane positions - mirrors TrackSpawner.LaneX
+        // FIX: define locally to avoid circular static dependency at startup
+        public static readonly float[] LaneX = { -TrackSpawner.LaneW, 0f, TrackSpawner.LaneW };
 
         // ── Tuning ────────────────────────────────────────────────────────────
         public float laneSpeed    = 16f;
