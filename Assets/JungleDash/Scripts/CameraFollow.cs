@@ -1,70 +1,24 @@
-// CameraFollow.cs
-// Smooth third-person camera that follows the player.
-// Adjusts FOV based on SpeedBoost ramp. No per-frame allocations.
+// CameraFollow.cs – Smooth 2D camera that follows the player horizontally only.
 using UnityEngine;
 
-[RequireComponent(typeof(Camera))]
 public class CameraFollow : MonoBehaviour
 {
-    // ─────────────────────────────────────────────
-    //  Inspector
-    // ─────────────────────────────────────────────
     [Header("Target")]
-    [Tooltip("The player transform to follow.")]
     public Transform target;
 
-    [Header("Offset")]
-    [Tooltip("Offset from the target in local camera space.")]
-    public Vector3 offset = new Vector3(0f, 2.8f, -5.5f);
+    [Header("Offset & Smoothing")]
+    public Vector3 offset = new Vector3(3f, 1f, -10f);
+    [Range(0.01f, 1f)] public float smoothTime = 0.15f;
 
-    [Header("Smoothing")]
-    [Tooltip("Position damping time (lower = tighter).")]
-    public float positionDamping = 0.12f;
-    [Tooltip("Rotation damping time.")]
-    public float rotationDamping = 0.08f;
+    Vector3 _vel;
 
-    [Header("FOV")]
-    [Tooltip("Base field of view (degrees).")]
-    public float baseFOV   = 65f;
-    [Tooltip("Far clip plane.")]
-    public float farClip   = 130f;
-
-    // ─────────────────────────────────────────────
-    //  Internal
-    // ─────────────────────────────────────────────
-    private Camera _cam;
-    private Vector3  _velRef   = Vector3.zero; // SmoothDamp ref
-    private float    _fovRef   = 0f;
-
-    private void Awake()
-    {
-        _cam          = GetComponent<Camera>();
-        _cam.farClipPlane = farClip;
-        _cam.fieldOfView  = baseFOV;
-    }
-
-    private void LateUpdate()
+    void LateUpdate()
     {
         if (target == null) return;
-
-        // Desired world position: target pos + world-space offset
-        // We only follow Z and Y of the target (X is fixed at 0 — player lanes vary)
-        Vector3 desiredPos = target.position + offset;
-
-        // Smooth position
-        transform.position = Vector3.SmoothDamp(
-            transform.position, desiredPos, ref _velRef, positionDamping);
-
-        // Always look slightly ahead of the player
-        Vector3 lookTarget = target.position + Vector3.forward * 2f + Vector3.up * 1.2f;
-        Quaternion desiredRot = Quaternion.LookRotation(lookTarget - transform.position);
-        transform.rotation = Quaternion.Slerp(
-            transform.rotation, desiredRot, rotationDamping / Time.deltaTime * 0.01f);
-
-        // FOV from speed boost
-        float fovBonus = PowerUpManager.Instance != null
-            ? PowerUpManager.Instance.FOVBonus : 0f;
-        _cam.fieldOfView = Mathf.SmoothDamp(
-            _cam.fieldOfView, baseFOV + fovBonus, ref _fovRef, 0.3f);
+        Vector3 desired = target.position + offset;
+        // Only follow X (horizontal), keep Y and Z fixed by offset
+        desired.y = offset.y;
+        desired.z = offset.z;
+        transform.position = Vector3.SmoothDamp(transform.position, desired, ref _vel, smoothTime);
     }
 }
