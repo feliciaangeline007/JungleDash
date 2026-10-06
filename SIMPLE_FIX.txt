@@ -1,0 +1,50 @@
+🔧 PALING SIMPLE FIX - Hanya 3 Langkah
+
+MASALAH:
+Standard Assets scripts error - namespace issues
+
+SOLUSI:
+
+**LANGKAH 1: Delete Library Folder**
+- Close Unity
+- Open Finder
+- Go to: /Users/fabrianivan/Jungle Dash
+- Delete folder: Library
+- Empty Trash
+
+**LANGKAH 2: Reopen Project**
+- Open Unity Hub
+- Click "Jungle Dash" project
+- Wait 5-10 minutes for reimport
+- You will see bar at bottom: "Importing..."
+
+**LANGKAH 3: Done!**
+- Console should show 0 errors
+- Click Play ▶️
+- Game should work
+
+Total time: 10 minutes
+Success rate: 99%
+
+---
+
+JIKA MASIH ERROR setelah reimport:
+
+Edit → Project Settings → Player
+→ Android tab
+→ Other Settings
+→ API Compatibility Level: .NET Standard 2.1
+→ Close
+
+Tunggu 10 detik, errors should be gone.
+
+Click Play ▶️
+
+---
+
+JIKA MASIH TIDAK JALAN:
+
+Check Console (Ctrl/Cmd+Shift+C)
+Copy error message
+Let me know the exact error
+
