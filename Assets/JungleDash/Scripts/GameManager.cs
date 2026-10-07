@@ -1,4 +1,4 @@
-// GameManager.cs – Manages score, coins, lives, game state, UI wiring.
+// GameManager.cs
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using TMPro;
@@ -8,15 +8,18 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    [Header("HUD References")]
+    [Header("HUD")]
     public TextMeshProUGUI scoreTMP;
     public TextMeshProUGUI coinTMP;
 
-    [Header("Game Over Panel")]
+    [Header("Game Over")]
     public GameObject gameOverPanel;
     public TextMeshProUGUI gameOverScoreTMP;
     public TextMeshProUGUI gameOverBestTMP;
     public Button restartButton;
+
+    [Header("Player Reference")]
+    public Transform PlayerTransform;
 
     public bool IsRunning { get; private set; }
 
@@ -38,11 +41,11 @@ public class GameManager : MonoBehaviour
     {
         IsRunning = true;
         if (gameOverPanel) gameOverPanel.SetActive(false);
-        if (restartButton) restartButton.onClick.AddListener(RestartGame);
+        if (restartButton) restartButton.onClick.AddListener(
+            () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex));
         PushHUD();
     }
 
-    // Called by PlayerController when it earns points
     public void AddScore(int pts)
     {
         if (!IsRunning) return;
@@ -50,12 +53,11 @@ public class GameManager : MonoBehaviour
         PushHUD();
     }
 
-    // Called by Coin pickup
-    public void AddCoin(int count = 1)
+    public void AddCoin(int n = 1)
     {
         if (!IsRunning) return;
-        _coins += count;
-        _score += count * 10;
+        _coins += n;
+        _score += n * 10;
         PushHUD();
     }
 
@@ -70,11 +72,9 @@ public class GameManager : MonoBehaviour
         if (gameOverBestTMP)  gameOverBestTMP.SetText("Best: {0}", best);
     }
 
-    void RestartGame() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-
     void PushHUD()
     {
-        if (_score != _lastScore)  { _lastScore = _score;  if (scoreTMP) scoreTMP.SetText("Score: {0:000000}", _score); }
-        if (_coins != _lastCoins)  { _lastCoins = _coins;  if (coinTMP)  coinTMP.SetText("x{0}", _coins); }
+        if (_score != _lastScore) { _lastScore = _score; if (scoreTMP) scoreTMP.SetText("Score: {0:000000}", _score); }
+        if (_coins != _lastCoins) { _lastCoins = _coins; if (coinTMP)  coinTMP.SetText("x{0}", _coins); }
     }
 }
