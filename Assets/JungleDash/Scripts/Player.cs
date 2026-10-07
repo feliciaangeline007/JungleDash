@@ -74,42 +74,61 @@ namespace JungleDash
                 cap.transform.SetParent(transform, false);
                 model = cap.transform;
                 int savedSkin = PlayerPrefs.GetInt("jd_selected_skin", 0);
-                Color capCol = savedSkin == 1 ? new Color(0.12f, 0.14f, 0.17f) : (savedSkin == 2 ? new Color(1f, 0.82f, 0.18f) : (savedSkin == 3 ? new Color(0.08f, 0.72f, 0.92f) : new Color(0.85f, 0.6f, 0.22f)));
-                Gfx.Prim(PrimitiveType.Capsule, model, new Vector3(0, 0.9f, 0), new Vector3(0.6f, 0.9f, 0.6f),
-                         Mats.Flat(capCol));
+                Color capCol = savedSkin == 1 ? new Color(0.12f, 0.14f, 0.17f)
+                            : savedSkin == 2 ? new Color(1f,    0.82f, 0.18f)
+                            : savedSkin == 3 ? new Color(0.08f, 0.72f, 0.92f)
+                            :                  new Color(0.72f, 0.58f, 0.30f);  // khaki
+                // Body capsule
+                Gfx.Prim(PrimitiveType.Capsule, model, new Vector3(0, 0.90f, 0), new Vector3(0.58f, 0.88f, 0.58f),
+                         Mats.Flat(capCol, 0.22f));
+                // Head sphere — slightly lighter
+                Gfx.Prim(PrimitiveType.Sphere, model, new Vector3(0, 1.95f, 0), new Vector3(0.45f, 0.45f, 0.45f),
+                         Mats.Flat(new Color(capCol.r + 0.08f, capCol.g + 0.06f, capCol.b), 0.18f));
+                // Teal explorer hat brim
+                Gfx.Prim(PrimitiveType.Cylinder, model, new Vector3(0, 2.22f, 0), new Vector3(0.55f, 0.06f, 0.55f),
+                         Mats.Flat(new Color(0.05f, 0.55f, 0.55f), 0.30f));
+                // Backpack
+                Gfx.Prim(PrimitiveType.Cube, model, new Vector3(0, 1.05f, -0.28f), new Vector3(0.32f, 0.45f, 0.22f),
+                         Mats.Flat(new Color(0.28f, 0.22f, 0.12f), 0.12f));
             }
 
-            // Power-up visual attachments
-            Material glass = Mats.Get(MatKind.Glass, new Color(0.3f, 0.65f, 1f, 0.28f), null, 1, 1, 0.9f);
+            // ── POWER-UP VISUALS — Bioluminescent Temple theme ────────────────
+            // Shield: electric blue glass bubble with teal emissive rim
+            Material glass = Mats.Get(MatKind.Glass, new Color(0.10f, 0.55f, 1.00f, 0.22f), null, 1, 1, 0.95f);
             shieldGO = Gfx.Prim(PrimitiveType.Sphere, transform, new Vector3(0, 0.95f, 0), new Vector3(2.3f, 2.3f, 2.3f),
                                 glass, default(Vector3), false, "Shield");
             shieldGO.SetActive(false);
 
-            Material mFly = Mats.Get(MatKind.Emissive, new Color(0.82f, 0.5f, 1f), null, 1, 1, 0.8f, 1.4f);
+            // Fly aura: vivid violet-purple wings with teal hover ring
+            Material mFly = Mats.Get(MatKind.Emissive, new Color(0.78f, 0.25f, 1.00f), null, 1, 1, 0.85f, 2.5f);
+            Material mFlyRing = Mats.Get(MatKind.Emissive, new Color(0.05f, 0.95f, 0.85f), null, 1, 1, 0.90f, 2.0f);
             flyGO = new GameObject("FlyAura");
             flyGO.transform.SetParent(transform, false);
-            Gfx.Prim(PrimitiveType.Cylinder, flyGO.transform, new Vector3(-0.65f, 1.15f, -0.2f), new Vector3(0.12f, 0.75f, 0.45f), mFly, new Vector3(25, 0, -35), false, "WingL");
-            Gfx.Prim(PrimitiveType.Cylinder, flyGO.transform, new Vector3(0.65f, 1.15f, -0.2f), new Vector3(0.12f, 0.75f, 0.45f), mFly, new Vector3(25, 0, 35), false, "WingR");
-            Gfx.Prim(PrimitiveType.Sphere, flyGO.transform, new Vector3(0, 0.05f, 0), new Vector3(1.2f, 0.18f, 1.2f), mFly, default(Vector3), false, "HoverRing");
+            Gfx.Prim(PrimitiveType.Cylinder, flyGO.transform, new Vector3(-0.70f, 1.18f, -0.22f), new Vector3(0.14f, 0.82f, 0.48f), mFly, new Vector3(22, 0, -38), false, "WingL");
+            Gfx.Prim(PrimitiveType.Cylinder, flyGO.transform, new Vector3( 0.70f, 1.18f, -0.22f), new Vector3(0.14f, 0.82f, 0.48f), mFly, new Vector3(22, 0,  38), false, "WingR");
+            Gfx.Prim(PrimitiveType.Cylinder, flyGO.transform, new Vector3(0, 0.05f, 0), new Vector3(1.25f, 0.10f, 1.25f), mFlyRing, default(Vector3), false, "HoverRing");
             flyGO.SetActive(false);
 
-            Material mSpd = Mats.Get(MatKind.Emissive, new Color(1f, 0.65f, 0.1f), null, 1, 1, 0.9f, 1.2f);
+            // Speed aura: deep orange elongated trail capsule
+            Material mSpd = Mats.Get(MatKind.Emissive, new Color(1f, 0.48f, 0.00f), null, 1, 1, 0.92f, 2.2f);
             speedGO = new GameObject("SpeedAura");
             speedGO.transform.SetParent(transform, false);
-            Gfx.Prim(PrimitiveType.Capsule, speedGO.transform, new Vector3(0, 0.9f, -0.3f), new Vector3(0.7f, 1.1f, 1.2f), mSpd, new Vector3(60, 0, 0), false, "Trail");
+            Gfx.Prim(PrimitiveType.Capsule, speedGO.transform, new Vector3(0, 0.90f, -0.45f), new Vector3(0.60f, 1.20f, 1.40f), mSpd, new Vector3(65, 0, 0), false, "Trail");
             speedGO.SetActive(false);
 
-            Material mDbl = Mats.Get(MatKind.Emissive, new Color(1f, 0.9f, 0.25f), null, 1, 1, 0.9f, 1.5f);
+            // Double score aura: blazing gold-yellow rotating star
+            Material mDbl = Mats.Get(MatKind.Emissive, new Color(1f, 0.95f, 0.05f), null, 1, 1, 0.92f, 2.5f);
             doubleGO = new GameObject("DoubleAura");
             doubleGO.transform.SetParent(transform, false);
-            Gfx.Prim(PrimitiveType.Cube, doubleGO.transform, new Vector3(0, 2.3f, 0), new Vector3(0.35f, 0.35f, 0.35f), mDbl, new Vector3(45, 45, 0), false, "Star");
+            Gfx.Prim(PrimitiveType.Cube,   doubleGO.transform, new Vector3(0, 2.35f, 0), new Vector3(0.38f, 0.38f, 0.38f), mDbl, new Vector3(45, 45, 0), false, "StarA");
+            Gfx.Prim(PrimitiveType.Sphere, doubleGO.transform, new Vector3(0, 2.35f, 0), new Vector3(0.22f, 0.22f, 0.22f), mDbl, default(Vector3), false, "StarCore");
             doubleGO.SetActive(false);
 
-            // Speed trail behind player
-            Material mTrail = Mats.Get(MatKind.Emissive, new Color(1f, 0.85f, 0.3f, 0.4f), null, 1, 1, 0.5f, 0.6f);
+            // Speed trail: teal-cyan ground streak
+            Material mTrail = Mats.Get(MatKind.Emissive, new Color(0.05f, 0.90f, 0.80f, 0.45f), null, 1, 1, 0.55f, 1.2f);
             trailGO = new GameObject("RunTrail");
             trailGO.transform.SetParent(transform, false);
-            Gfx.Prim(PrimitiveType.Cube, trailGO.transform, new Vector3(0, 0.05f, -0.8f), new Vector3(0.6f, 0.06f, 1.8f), mTrail, default(Vector3), false, "TrailStrip");
+            Gfx.Prim(PrimitiveType.Cube, trailGO.transform, new Vector3(0, 0.04f, -0.9f), new Vector3(0.55f, 0.05f, 2.2f), mTrail, default(Vector3), false, "TrailStrip");
             trailGO.SetActive(false);
         }
 
@@ -142,10 +161,10 @@ namespace JungleDash
                     accentCol = new Color(0.85f, 0.18f, 0.95f);
                     smooth = 0.6f;
                     break;
-                default: // Classic Explorer
-                    bodyCol = new Color(0.86f, 0.58f, 0.2f);
-                    accentCol = new Color(0.08f, 0.08f, 0.1f);
-                    smooth = 0.25f;
+                default: // Classic Explorer — teal-accented khaki field gear
+                    bodyCol = new Color(0.72f, 0.58f, 0.30f);   // warm khaki
+                    accentCol = new Color(0.05f, 0.62f, 0.62f); // teal accent
+                    smooth = 0.20f;
                     break;
             }
 

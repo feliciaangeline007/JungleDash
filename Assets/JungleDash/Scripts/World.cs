@@ -58,33 +58,56 @@ namespace JungleDash
             Texture2D palm = ga != null && ga.palm != null ? ga.palm : Resources.Load<Texture2D>("PalmBillboard");
             Texture2D broadleaf = ga != null && ga.broadleaf != null ? ga.broadleaf : Resources.Load<Texture2D>("BroadleafBillboard");
 
-            // Refined architectural & nature materials using AI-generated textures
-            mStonePath = Mats.Get(MatKind.Opaque, new Color(0.72f, 0.68f, 0.62f), stonePath, 2.5f, SegLen / 4.5f, 0.2f);
-            mStoneCurb = Mats.Get(MatKind.Opaque, new Color(0.65f, 0.62f, 0.58f), carvedStone, 1f, SegLen / 5f, 0.25f);
-            mStoneArch = Mats.Get(MatKind.Opaque, new Color(0.70f, 0.68f, 0.64f), carvedStone, 1.2f, 1.2f, 0.2f);
-            mGrass = Mats.Get(MatKind.Opaque, new Color(0.55f, 0.85f, 0.45f), grass, 8f, SegLen / 3f, 0.08f);
-            mRock = Mats.Get(MatKind.Opaque, new Color(0.65f, 0.62f, 0.58f), carvedStone, 1.5f, 1.5f, 0.15f);
-            mBark = Mats.Get(MatKind.Opaque, new Color(0.80f, 0.70f, 0.60f), bark, 1f, 1.5f, 0.12f);
-            mCut = Mats.Flat(new Color(0.82f, 0.60f, 0.35f), 0.15f);
-            mLeaf = Mats.Flat(new Color(0.14f, 0.52f, 0.18f), 0.12f);
-            mLeaf2 = Mats.Flat(new Color(0.24f, 0.65f, 0.20f), 0.15f);
-            mMoss = Mats.Flat(new Color(0.20f, 0.50f, 0.16f), 0.08f);
-            mVine = Mats.Flat(new Color(0.18f, 0.48f, 0.16f), 0.12f);
-            mFlower = Mats.Get(MatKind.Emissive, new Color(1f, 0.25f, 0.45f), null, 1, 1, 0.3f, 0.8f);
-            mFlower2 = Mats.Get(MatKind.Emissive, new Color(1f, 0.82f, 0.20f), null, 1, 1, 0.3f, 0.8f);
-            mTorchFire = Mats.Get(MatKind.Emissive, new Color(1f, 0.55f, 0.08f), null, 1, 1, 0.9f, 2.0f);
+            // ── BIOLUMINESCENT ANCIENT TEMPLE theme ──────────────────────────
+            // Environment: dark basalt with cyan rune cracks, amber temple stone,
+            // deep mahogany bark, vivid neon jungle floor, dramatic torch glow.
 
-            // Power-ups and collectibles with ornate gold relic texture
-            mGold = Mats.Get(MatKind.Emissive, new Color(1f, 0.85f, 0.25f), relic, 1f, 1f, 0.85f, 0.6f);
-            mGem = Mats.Get(MatKind.Emissive, new Color(0.15f, 0.95f, 1f), null, 1, 1, 0.9f, 1.2f);
-            mShield = Mats.Get(MatKind.Emissive, new Color(0.25f, 0.60f, 1f), null, 1, 1, 0.85f, 1.3f);
-            mMagnet = Mats.Get(MatKind.Emissive, new Color(1f, 0.22f, 0.22f), null, 1, 1, 0.7f, 1.0f);
-            mMagnetTip = Mats.Flat(new Color(0.95f, 0.95f, 0.95f), 0.75f);
-            mSpeed = Mats.Get(MatKind.Emissive, new Color(1f, 0.58f, 0.08f), null, 1, 1, 0.9f, 1.5f);
-            mFly = Mats.Get(MatKind.Emissive, new Color(0.85f, 0.45f, 1f), null, 1, 1, 0.9f, 1.6f);
-            mDouble = Mats.Get(MatKind.Emissive, new Color(1f, 0.92f, 0.2f), null, 1, 1, 0.9f, 1.5f);
+            // Path: dark basalt tinted cool, rune texture adds cyan crack shimmer
+            mStonePath = Mats.Get(MatKind.Opaque, new Color(0.30f, 0.31f, 0.33f), stonePath, 3f, SegLen / 4f, 0.35f);
+            // Curb: slightly lighter with warm buff sandstone cast
+            mStoneCurb = Mats.Get(MatKind.Opaque, new Color(0.52f, 0.48f, 0.40f), carvedStone, 1f, SegLen / 5f, 0.28f);
+            // Arch/pillar: warm amber sandstone with deep tribal carving shadows
+            mStoneArch = Mats.Get(MatKind.Opaque, new Color(0.68f, 0.58f, 0.38f), carvedStone, 1.4f, 1.4f, 0.22f);
+            // Ground: vivid tropical green, bright and saturated
+            mGrass = Mats.Get(MatKind.Opaque, new Color(0.18f, 0.62f, 0.22f), grass, 6f, SegLen / 3f, 0.06f);
+            // Rock: dark slate-blue grey (cooler than the warm stone)
+            mRock = Mats.Get(MatKind.Opaque, new Color(0.32f, 0.34f, 0.40f), carvedStone, 1.8f, 1.8f, 0.20f);
+            // Bark: deep rich mahogany tint
+            mBark = Mats.Get(MatKind.Opaque, new Color(0.52f, 0.32f, 0.16f), bark, 1f, 1.8f, 0.10f);
+            // Cut log ends: fresh pale wood, high contrast with dark bark
+            mCut = Mats.Flat(new Color(0.88f, 0.72f, 0.48f), 0.18f);
+            // Leaves: two shades — deep jungle green + bright lime
+            mLeaf  = Mats.Flat(new Color(0.12f, 0.48f, 0.14f), 0.10f);
+            mLeaf2 = Mats.Flat(new Color(0.22f, 0.72f, 0.18f), 0.12f);
+            // Moss: cool teal-green (bioluminescent hint)
+            mMoss  = Mats.Get(MatKind.Emissive, new Color(0.08f, 0.55f, 0.38f), null, 1, 1, 0.15f, 0.25f);
+            // Vines: dark olive green
+            mVine  = Mats.Flat(new Color(0.14f, 0.40f, 0.12f), 0.08f);
+            // Flowers: HOT PINK neon emissive + CYAN neon emissive
+            mFlower  = Mats.Get(MatKind.Emissive, new Color(1.00f, 0.08f, 0.55f), null, 1, 1, 0.4f, 1.8f);
+            mFlower2 = Mats.Get(MatKind.Emissive, new Color(0.05f, 0.95f, 0.80f), null, 1, 1, 0.4f, 1.6f);
+            // Torch: intense amber-white hot flame
+            mTorchFire = Mats.Get(MatKind.Emissive, new Color(1f, 0.72f, 0.12f), null, 1, 1, 0.95f, 3.5f);
 
-            if (palm != null) mPalm = Mats.Get(MatKind.Cutout, Color.white, palm, 1, 1, 0.05f);
+            // ── COLLECTIBLES & POWER-UPS ──────────────────────────────────────
+            // Gold coin: rich Aztec gold, relic texture, strong emissive glow
+            mGold      = Mats.Get(MatKind.Emissive, new Color(1f, 0.82f, 0.10f), relic, 1f, 1f, 0.90f, 1.2f);
+            // Gem: vivid electric cyan, very bright
+            mGem       = Mats.Get(MatKind.Emissive, new Color(0.00f, 0.95f, 1.00f), null, 1, 1, 0.95f, 2.5f);
+            // Shield: royal electric blue
+            mShield    = Mats.Get(MatKind.Emissive, new Color(0.15f, 0.50f, 1.00f), null, 1, 1, 0.88f, 2.0f);
+            // Magnet: saturated crimson red
+            mMagnet    = Mats.Get(MatKind.Emissive, new Color(0.95f, 0.10f, 0.10f), null, 1, 1, 0.72f, 1.8f);
+            // Magnet tips: bright silver-white
+            mMagnetTip = Mats.Flat(new Color(0.92f, 0.96f, 1.00f), 0.90f);
+            // Speed boost: intense deep orange
+            mSpeed     = Mats.Get(MatKind.Emissive, new Color(1f, 0.48f, 0.00f), null, 1, 1, 0.90f, 2.2f);
+            // Fly: vivid violet-purple
+            mFly       = Mats.Get(MatKind.Emissive, new Color(0.78f, 0.25f, 1.00f), null, 1, 1, 0.88f, 2.5f);
+            // Double score: blazing gold-yellow
+            mDouble    = Mats.Get(MatKind.Emissive, new Color(1f, 0.95f, 0.05f), null, 1, 1, 0.92f, 2.2f);
+
+            if (palm      != null) mPalm  = Mats.Get(MatKind.Cutout, Color.white, palm,      1, 1, 0.05f);
             if (broadleaf != null) mBroad = Mats.Get(MatKind.Cutout, Color.white, broadleaf, 1, 1, 0.05f);
 
             itemRoot = new GameObject("Items").transform;

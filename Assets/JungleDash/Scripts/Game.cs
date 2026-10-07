@@ -384,19 +384,21 @@ namespace JungleDash
                 sun.type = LightType.Directional;
             }
             sun.name = "Sun";
-            sun.color = new Color(1f, 0.93f, 0.76f);
-            sun.intensity = 1.25f;
-            sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.75f;
-            sun.transform.rotation = Quaternion.Euler(50f, -28f, 0f);
+            // Warm golden dusk light — flatters both the amber stone and cyan glows
+            sun.color     = new Color(1.00f, 0.88f, 0.62f);
+            sun.intensity = 1.15f;
+            sun.shadows   = LightShadows.Soft;
+            sun.shadowStrength = 0.80f;
+            sun.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
 
-            RenderSettings.skybox = null;
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.52f, 0.62f, 0.58f);
-            RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.016f;
-            RenderSettings.fogColor = new Color(0.62f, 0.82f, 0.74f);
+            // Dark deep-jungle atmosphere — lets the emissive glows pop
+            RenderSettings.skybox     = null;
+            RenderSettings.ambientMode  = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.20f, 0.28f, 0.24f);  // very dark green-grey
+            RenderSettings.fog          = true;
+            RenderSettings.fogMode      = FogMode.ExponentialSquared;
+            RenderSettings.fogDensity   = 0.018f;
+            RenderSettings.fogColor     = new Color(0.12f, 0.22f, 0.18f);  // deep jungle green fog
         }
 
         void WireCallbacks()
@@ -771,22 +773,24 @@ namespace JungleDash
 
         void ApplyStageBiome(int stageId)
         {
-            Color haze = new Color(0.62f, 0.82f, 0.74f);
-            Color sunCol = new Color(1f, 0.93f, 0.76f);
-            Color ambCol = new Color(0.52f, 0.62f, 0.58f);
+            // Default: dark bioluminescent jungle
+            Color haze   = new Color(0.12f, 0.22f, 0.18f);
+            Color sunCol = new Color(1.00f, 0.88f, 0.62f);
+            Color ambCol = new Color(0.20f, 0.28f, 0.24f);
 
             if (stageId > 0 && stageId <= GameConfig.Stages.Length)
             {
                 LevelData stage = GameConfig.Stages[stageId - 1];
-                haze = stage.hazeColor;
+                // Darken all biome colours by 40% to stay in the dark-atmospheric theme
+                haze   = stage.hazeColor   * 0.55f;
                 sunCol = stage.sunColor;
-                ambCol = stage.ambientColor;
+                ambCol = stage.ambientColor * 0.50f;
             }
 
             CamCtrl.SetBackgroundColor(haze);
-            RenderSettings.fogColor = haze;
+            RenderSettings.fogColor     = haze;
             RenderSettings.ambientLight = ambCol;
-            if (sun != null) sun.color = sunCol;
+            if (sun != null) sun.color  = sunCol;
         }
 
         void Update()
