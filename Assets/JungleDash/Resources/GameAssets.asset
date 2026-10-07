@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7b6f64e0b43f40e5b696980b3fd67c7, type: 3}
+  m_Name: GameAssets
+  ethan: {fileID: 100000, guid: 1378eba68a0b34c9a8b54fdb8cce4b25, type: 3}
+  animator: {fileID: 9100000, guid: e2cf68ff4b1ffda45a77f7307dd789b9, type: 2}
+  mud: {fileID: 2800000, guid: 3a72d959c2ea347eeac91e3e4ce31801, type: 3}
+  grass: {fileID: 2800000, guid: 223f6b43a79154b0194fa6643e385123, type: 3}
+  cliff: {fileID: 2800000, guid: 3a72d959c2ea347eeac91e3e4ce31801, type: 3}
+  palm: {fileID: 2800000, guid: 83490c46e515b449d9942f3077abd4df, type: 3}
+  broadleaf: {fileID: 2800000, guid: 082fe86189c3e434a886294328534614, type: 3}
